@@ -6,11 +6,17 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-export default function NewWorldPage() {
+export default function NewBookPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ name: '', genre: 'Fantasy', premise: '' })
+  const [form, setForm] = useState({
+    title: '',
+    genre: 'Fantasy',
+    premise: '',
+    protagonist_name: '',
+    protagonist_description: '',
+  })
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -19,18 +25,18 @@ export default function NewWorldPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name.trim()) { setError('World name is required.'); return }
+    if (!form.title.trim()) { setError('Title is required.'); return }
 
     setLoading(true)
     try {
-      const res = await fetch('/api/worlds', {
+      const res = await fetch('/api/books', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
       if (!res.ok) throw new Error()
-      const world = await res.json()
-      router.push(`/worlds/${world.id}`)
+      const book = await res.json()
+      router.push(`/books/${book.id}`)
     } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)
@@ -49,22 +55,22 @@ export default function NewWorldPage() {
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight">New World</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">New Book</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Give your world a name and Grimoire will help you build it from there.
+              Tell Grimoire what you're working on and it will build your workspace from there.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            {/* Name */}
+            {/* Title */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
-                Name <span className="text-destructive">*</span>
+                Title <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
+                value={form.title}
+                onChange={(e) => set('title', e.target.value)}
                 placeholder="The Ashen Throne"
                 autoFocus
                 className="px-3 py-2 rounded-md border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring text-sm"
@@ -88,19 +94,36 @@ export default function NewWorldPage() {
             {/* Premise */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
-                Premise{' '}
-                <span className="text-muted-foreground font-normal">(optional)</span>
+                Premise <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
               <textarea
                 value={form.premise}
                 onChange={(e) => set('premise', e.target.value)}
-                placeholder="A dying empire where magic is outlawed and the old gods have gone silent..."
+                placeholder="What is this story about? 1–3 sentences."
                 rows={3}
                 className="px-3 py-2 rounded-md border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
               />
-              <p className="text-xs text-muted-foreground">
-                1–3 sentences. Grimoire will use this to set the tone.
+            </div>
+
+            {/* Protagonist */}
+            <div className="flex flex-col gap-3">
+              <p className="text-sm font-medium">
+                Protagonist <span className="text-muted-foreground font-normal">(optional)</span>
               </p>
+              <input
+                type="text"
+                value={form.protagonist_name}
+                onChange={(e) => set('protagonist_name', e.target.value)}
+                placeholder="Name"
+                className="px-3 py-2 rounded-md border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+              />
+              <input
+                type="text"
+                value={form.protagonist_description}
+                onChange={(e) => set('protagonist_description', e.target.value)}
+                placeholder="One-line description"
+                className="px-3 py-2 rounded-md border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+              />
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
@@ -117,7 +140,7 @@ export default function NewWorldPage() {
                 disabled={loading}
                 className="flex-1 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
               >
-                {loading ? 'Creating...' : 'Create World'}
+                {loading ? 'Creating...' : 'Create Book'}
               </button>
             </div>
           </form>

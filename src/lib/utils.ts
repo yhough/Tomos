@@ -11,12 +11,12 @@ export function generateId(): string {
 }
 
 export function formatDate(date: Date | number | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
+  const d = new Date(typeof date === 'string' ? date : date instanceof Date ? date.getTime() : date)
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  }).format(d instanceof Date ? d : new Date(d))
+  }).format(d)
 }
 
 export function formatRelativeDate(date: Date | number | string): string {
@@ -34,41 +34,20 @@ export function formatRelativeDate(date: Date | number | string): string {
   return formatDate(d)
 }
 
-export function parseLoreData<T>(json: string): T {
-  try {
-    return JSON.parse(json) as T
-  } catch {
-    return {} as T
-  }
-}
-
-export function parseMetadata<T>(json: string): T {
-  try {
-    return JSON.parse(json) as T
-  } catch {
-    return {} as T
-  }
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
 }
 
 export const GENRES = [
   'Fantasy',
   'Science Fiction',
-  'Historical Fiction',
-  'Horror',
-  'Contemporary',
-  'Mythology',
-  'Steampunk',
-  'Post-Apocalyptic',
+  'Literary Fiction',
   'Thriller',
+  'Romance',
+  'Horror',
+  'Historical Fiction',
+  'Mystery',
+  'Contemporary Fiction',
+  'Screenplay',
   'Other',
 ] as const
-
-export type Genre = (typeof GENRES)[number]
-
-export const LORE_TYPE_LABELS: Record<string, string> = {
-  character: 'Characters',
-  faction: 'Factions',
-  location: 'Locations',
-  history: 'History',
-  misc: 'Lore & Misc',
-}
