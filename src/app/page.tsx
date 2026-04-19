@@ -49,7 +49,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-primary" />
-            <span className="font-semibold tracking-tight text-foreground">Grimoire</span>
+            <span className="text-foreground text-xl" style={{ fontFamily: 'Lumos' }}>Grimoire</span>
           </div>
           <Link
             href="/worlds/new"
