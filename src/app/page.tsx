@@ -4,47 +4,35 @@ import { WorldCard } from '@/components/WorldCard'
 import type { World } from '@/types'
 import { BookOpen, Plus, Sparkles } from 'lucide-react'
 import Link from 'next/link'
-
-// Placeholder worlds — replace with db fetch once API is wired
-const MOCK_WORLDS: World[] = [
-  {
-    id: 'demo-1',
-    name: 'The Ashen Throne',
-    genre: 'Fantasy',
-    premise: 'A dying empire where magic is outlawed and the old gods have gone silent.',
-    description:
-      "A crumbling empire built on the bones of a forgotten magical age. The king is old, his heirs are at war, and something stirs in the Ashwood that hasn't moved in three hundred years.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 32),
-  },
-  {
-    id: 'demo-2',
-    name: 'Outer Veil',
-    genre: 'Science Fiction',
-    premise: "Humanity's furthest colony loses contact with Earth — and starts receiving transmissions from something else.",
-    description:
-      "Set aboard the generation ship Covenant's Wake, 200 years after departure. Earth has gone quiet. The crew votes to investigate a signal that predates human spaceflight.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
-  },
-  {
-    id: 'demo-3',
-    name: 'The Bellhaven Files',
-    genre: 'Horror',
-    premise: "A small coastal town where the tide brings things back that shouldn't return.",
-    description:
-      'Bellhaven, Maine. Population 1,400. Every seven years, the ocean gives something back to the town — and the town pays a price no one talks about.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 8),
-  },
-]
+import { useEffect, useState } from 'react'
 
 export default function Home() {
-  const worlds = MOCK_WORLDS
+  const [worlds, setWorlds] = useState<World[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/worlds')
+      .then((r) => r.json())
+      .then((data) => {
+        setWorlds(
+          data.map((w: Record<string, unknown>) => ({
+            ...w,
+            createdAt: new Date(w.created_at as number),
+            updatedAt: new Date(w.updated_at as number),
+          }))
+        )
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  function handleDelete(id: string) {
+    fetch(`/api/worlds/${id}`, { method: 'DELETE' }).then(() =>
+      setWorlds((ws) => ws.filter((w) => w.id !== id))
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Top nav */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -62,7 +50,11 @@ export default function Home() {
       </header>
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-10">
-        {worlds.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-32 text-muted-foreground text-sm">
+            Loading...
+          </div>
+        ) : worlds.length === 0 ? (
           <EmptyState />
         ) : (
           <>
@@ -72,10 +64,9 @@ export default function Home() {
                 {worlds.length} {worlds.length === 1 ? 'world' : 'worlds'}
               </p>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {worlds.map((world) => (
-                <WorldCard key={world.id} world={world} onDelete={(id) => console.log('delete', id)} />
+                <WorldCard key={world.id} world={world} onDelete={handleDelete} />
               ))}
             </div>
           </>
