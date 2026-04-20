@@ -8,7 +8,8 @@ import { LoreSidebar, type LoreSidebarHandle } from '@/components/LoreSidebar'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { WorldMessage, type WorldMessageData } from '@/components/WorldMessage'
 import { mockBook, mockChapters, mockCharacters, mockLoreSections, mockMessages, mockProcessingSteps, MOCK_BOOK_ID } from '@/lib/mock-data'
-import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Sparkles, Upload, Zap } from 'lucide-react'
+import { useTheme } from '@/hooks/useTheme'
+import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Moon, Sparkles, Sun, Upload, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
@@ -27,6 +28,7 @@ interface Props {
 
 export default function BookPage({ params }: Props) {
   const [tab, setTab] = useState<Tab>('world')
+  const { dark, toggle: toggleTheme } = useTheme()
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -52,6 +54,13 @@ export default function BookPage({ params }: Props) {
                 {TAB_LABELS[t]}
               </button>
             ))}
+            <button
+              onClick={toggleTheme}
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="ml-1 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              {dark ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
           </nav>
         </div>
       </header>

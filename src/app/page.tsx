@@ -1,9 +1,10 @@
 'use client'
 
 import { BookCard } from '@/components/BookCard'
+import { useTheme } from '@/hooks/useTheme'
 import { mockBook, MOCK_BOOK_ID } from '@/lib/mock-data'
 import type { Book } from '@/types'
-import { BookOpen, Clock, Home, Library, Plus, Search, Settings, Sparkles, X } from 'lucide-react'
+import { BookOpen, Clock, Home, Library, Moon, Plus, Search, Settings, Sparkles, Sun, X } from 'lucide-react'
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -28,6 +29,7 @@ export default function HomePage() {
   const [tab, setTab] = useState<Tab>('home')
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
+  const { dark, toggle: toggleTheme } = useTheme()
 
   useEffect(() => {
     fetch('/api/books')
@@ -106,6 +108,13 @@ export default function HomePage() {
               <p className="text-sm font-medium text-foreground leading-tight truncate">Yaelin</p>
               <p className="text-xs text-muted-foreground leading-tight truncate">Free plan</p>
             </div>
+            <button
+              onClick={toggleTheme}
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground/50 hover:text-muted-foreground"
+            >
+              {dark ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
             <Settings
               size={13}
               className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0"

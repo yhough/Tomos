@@ -144,7 +144,7 @@ export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSid
               {hiddenOptional.map(({ key, label, dot }) => (
                 <button
                   key={key}
-                  onClick={() => setUnlocked((u) => new Set([...u, key]))}
+                  onClick={() => setUnlocked((u) => { const n = new Set(u); n.add(key); return n })}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md text-left w-full hover:bg-muted/50 transition-colors group"
                 >
                   <Plus size={10} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
