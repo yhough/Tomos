@@ -709,7 +709,7 @@ function ChaptersTab({
                 {pasteText.length.toLocaleString('en-US')} characters
               </p>
 
-              {analyzeError && !isMock && (
+              {analyzeError && (
                 <p style={{ color: 'hsl(var(--grimm-danger))', fontSize: 12, marginTop: 8 }}>
                   {analyzeError}
                 </p>
@@ -726,8 +726,8 @@ function ChaptersTab({
                   {isAnalyzing ? 'Analyzing… this takes 15–30 seconds' : 'Processing takes about 15–30 seconds'}
                 </span>
                 <button
-                  onClick={isMock ? undefined : handleAnalyzeChapter}
-                  disabled={isAnalyzing || isMock}
+                  onClick={handleAnalyzeChapter}
+                  disabled={isAnalyzing}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -739,8 +739,7 @@ function ChaptersTab({
                     fontSize: 13,
                     fontWeight: 500,
                     border: 'none',
-                    cursor: isAnalyzing || isMock ? 'not-allowed' : 'pointer',
-                    opacity: isMock ? 0.5 : 1,
+                    cursor: isAnalyzing ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {isAnalyzing ? (
@@ -763,7 +762,7 @@ function ChaptersTab({
           ) : (
             <>
               <DropZone />
-              {analyzeError && !isMock && (
+              {analyzeError && (
                 <p style={{ color: 'hsl(var(--grimm-danger))', fontSize: 12, marginTop: 8 }}>
                   {analyzeError}
                 </p>
@@ -780,8 +779,8 @@ function ChaptersTab({
                   {isAnalyzing ? 'Analyzing… this takes 15–30 seconds' : 'Processing takes about 15–30 seconds'}
                 </span>
                 <button
-                  onClick={isMock ? undefined : handleAnalyzeChapter}
-                  disabled={isAnalyzing || isMock}
+                  onClick={handleAnalyzeChapter}
+                  disabled={isAnalyzing}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -793,8 +792,7 @@ function ChaptersTab({
                     fontSize: 13,
                     fontWeight: 500,
                     border: 'none',
-                    cursor: isAnalyzing || isMock ? 'not-allowed' : 'pointer',
-                    opacity: isMock ? 0.5 : 1,
+                    cursor: isAnalyzing ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {isAnalyzing ? (
