@@ -15,6 +15,8 @@ interface Props {
   sortBy: SortBy
   onSortChange: (value: SortBy) => void
   onResolveViaChat?: (message: string, flagId: string) => void
+  onRequestUpload?: (number: number, title: string) => void
+  onScrollToUpload?: () => void
 }
 
 export function ChapterList({
@@ -25,6 +27,8 @@ export function ChapterList({
   sortBy,
   onSortChange,
   onResolveViaChat,
+  onRequestUpload,
+  onScrollToUpload,
 }: Props) {
   const processedCount = chapters.filter((c) => c.processed).length
 
@@ -63,7 +67,7 @@ export function ChapterList({
           Upload your first chapter to begin building your story&apos;s history.
         </p>
         <button
-          onClick={() => console.log('Upload chapter')}
+          onClick={() => onScrollToUpload?.()}
           style={{
             backgroundColor: 'hsl(var(--grimm-accent))',
             color: 'hsl(var(--background))',
@@ -126,6 +130,7 @@ export function ChapterList({
             isExpanded={expandedChapterId === chapter.id}
             onToggle={() => onToggleChapter(chapter.id)}
             onResolveViaChat={onResolveViaChat}
+            onRequestUpload={onRequestUpload}
           />
         ))}
       </div>

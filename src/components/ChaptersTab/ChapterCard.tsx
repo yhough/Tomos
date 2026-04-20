@@ -18,6 +18,7 @@ interface Props {
   isExpanded: boolean
   onToggle: () => void
   onResolveViaChat?: (message: string, flagId: string) => void
+  onRequestUpload?: (number: number, title: string) => void
 }
 
 function formatDate(date: Date) {
@@ -82,7 +83,7 @@ function StatusBadge({ chapter }: { chapter: Chapter }) {
   )
 }
 
-export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveViaChat }: Props) {
+export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveViaChat, onRequestUpload }: Props) {
   const isMock = bookId === MOCK_BOOK_ID
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [addingNote, setAddingNote] = useState(false)
@@ -306,7 +307,7 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
                 Upload the text to extract characters, check continuity, and update your world.
               </p>
               <button
-                onClick={() => console.log('Analyze now', chapter.id)}
+                onClick={() => onRequestUpload?.(chapter.number, chapter.title)}
                 style={{ backgroundColor: 'hsl(var(--grimm-accent))', color: 'hsl(var(--background))', padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, marginTop: 16, border: 'none', cursor: 'pointer' }}
               >
                 Analyze now
@@ -405,17 +406,16 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
                 <PenLine size={11} />
                 Add note
               </button>
-              {chapter.processed && (['Re-upload', 'View full text'] as const).map((label) => (
+              {chapter.processed && (
                 <button
-                  key={label}
-                  onClick={() => console.log(label, chapter.id)}
+                  onClick={() => onRequestUpload?.(chapter.number, chapter.title)}
                   style={btn}
                   onMouseEnter={(e) => (e.currentTarget.style.color = 'hsl(var(--grimm-text))')}
                   onMouseLeave={(e) => (e.currentTarget.style.color = 'hsl(var(--grimm-muted))')}
                 >
-                  {label}
+                  Re-upload
                 </button>
-              ))}
+              )}
             </div>
           </div>
 

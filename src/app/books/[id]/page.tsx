@@ -550,6 +550,13 @@ function ChaptersTab({
     setTimeout(() => pasteTextareaRef.current?.focus(), 300)
   }
 
+  function handleRequestUpload(number: number, title: string) {
+    setChapterNumber(String(number))
+    setChapterTitle(title)
+    setUploadMode('paste')
+    scrollToUpload()
+  }
+
   async function handleAnalyzeChapter() {
     const text = pasteText.trim()
     if (!text) { setAnalyzeError('Paste your chapter text first.'); return }
@@ -862,7 +869,10 @@ function ChaptersTab({
             </>
           ) : (
             <>
-              <DropZone />
+              <DropZone
+                onFileContent={(text) => { setPasteText(text); setUploadMode('paste') }}
+                onError={(msg) => setAnalyzeError(msg)}
+              />
               {analyzeError && (
                 <p style={{ color: 'hsl(var(--grimm-danger))', fontSize: 12, marginTop: 8 }}>
                   {analyzeError}
@@ -932,21 +942,67 @@ function ChaptersTab({
           sortBy={sortBy}
           onSortChange={setSortBy}
           onResolveViaChat={onResolveViaChat}
+          onRequestUpload={handleRequestUpload}
+          onScrollToUpload={scrollToUpload}
         />
       </div>
     </div>
   )
 }
 
-function DropZone() {
+function DropZone({ onFileContent, onError }: { onFileContent: (text: string) => void; onError: (msg: string) => void }) {
   const [hovering, setHovering] = useState(false)
+
+  async function readFile(file: File) {
+    const isTxt = file.name.endsWith('.txt')
+    const isDocx = file.name.endsWith('.docx')
+    if (!isTxt && !isDocx) {
+      onError('Only .txt and .docx files are supported.')
+      return
+    }
+    if (isTxt) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const text = e.target?.result as string
+        if (text) onFileContent(text)
+      }
+      reader.onerror = () => onError('Failed to read file.')
+      reader.readAsText(file)
+    } else {
+      try {
+        const mammoth = (await import('mammoth')).default
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.extractRawText({ arrayBuffer })
+        if (result.value) onFileContent(result.value)
+        else onError('Could not extract text from this .docx file.')
+      } catch {
+        onError('Failed to read .docx file.')
+      }
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setHovering(false)
+    const file = e.dataTransfer.files[0]
+    if (file) readFile(file)
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) readFile(file)
+    e.target.value = ''
+  }
 
   return (
     <div
-      onClick={() => console.log('Browse file')}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
+      onDragOver={(e) => { e.preventDefault(); setHovering(true) }}
+      onDragLeave={() => setHovering(false)}
+      onDrop={handleDrop}
       style={{
+        position: 'relative',
         border: `1px dashed ${hovering ? 'hsl(var(--grimm-accent) / 0.5)' : 'hsl(var(--grimm-border))'}`,
         borderRadius: 10,
         backgroundColor: hovering ? 'hsl(var(--grimm-surface-raised) / 0.8)' : 'hsl(var(--grimm-surface-raised))',
@@ -956,14 +1012,21 @@ function DropZone() {
         transition: 'border-color 150ms ease, background-color 150ms ease',
       }}
     >
-      <Upload size={32} style={{ color: 'hsl(var(--grimm-muted))', margin: '0 auto' }} />
-      <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 14, marginTop: 12 }}>
-        Drop your .txt or .docx file here
+      {/* Invisible file input covers the entire zone — most reliable cross-browser approach */}
+      <input
+        type="file"
+        accept=".txt,.docx"
+        onChange={handleChange}
+        style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+      />
+      <Upload size={32} style={{ color: 'hsl(var(--grimm-muted))', margin: '0 auto', pointerEvents: 'none' }} />
+      <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 14, marginTop: 12, pointerEvents: 'none' }}>
+        Drop your file here
       </p>
-      <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 13, marginTop: 4 }}>
+      <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 13, marginTop: 4, pointerEvents: 'none' }}>
         or click to browse
       </p>
-      <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 11, marginTop: 8 }}>
+      <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 11, marginTop: 8, pointerEvents: 'none' }}>
         Supports .txt and .docx
       </p>
     </div>
