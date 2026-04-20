@@ -98,7 +98,10 @@ export default function HomePage() {
 
         {/* User profile */}
         <div className="p-3 border-t border-border">
-          <div className="flex items-center gap-2.5 px-1 py-1 rounded-md group hover:bg-muted transition-colors cursor-pointer">
+          <Link
+            href="/login"
+            className="flex items-center gap-2.5 px-1 py-1 rounded-md group hover:bg-muted transition-colors"
+          >
             <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
               <span className="text-primary text-xs font-semibold" style={{ fontFamily: 'var(--font-geist-sans)' }}>
                 Y
@@ -109,7 +112,7 @@ export default function HomePage() {
               <p className="text-xs text-muted-foreground leading-tight truncate">Free plan</p>
             </div>
             <button
-              onClick={toggleTheme}
+              onClick={(e) => { e.preventDefault(); toggleTheme() }}
               title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
               className="shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground/50 hover:text-muted-foreground"
             >
@@ -119,7 +122,7 @@ export default function HomePage() {
               size={13}
               className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0"
             />
-          </div>
+          </Link>
         </div>
       </aside>
 
