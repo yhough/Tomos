@@ -1,10 +1,12 @@
 'use client'
 
+import { MOCK_BOOK_ID } from '@/lib/mock-data'
 import { formatRelativeDate } from '@/lib/utils'
 import type { Book } from '@/types'
-import { FileText, Trash2 } from 'lucide-react'
+import { Camera, FileText, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 
 const GENRE_GRADIENTS: Record<string, string> = {
   Fantasy: 'from-violet-950 via-purple-900 to-indigo-950',
@@ -40,8 +42,17 @@ interface Props {
 }
 
 export function BookCard({ book, onDelete }: Props) {
+  const router = useRouter()
+  const isMock = book.id === MOCK_BOOK_ID
+
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [relativeDate, setRelativeDate] = useState('')
+  const [coverImage, setCoverImage] = useState<string | null>(book.cover_image ?? null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [coverVersion, setCoverVersion] = useState(Date.now())
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setRelativeDate(formatRelativeDate(book.updated_at))
@@ -49,6 +60,20 @@ export function BookCard({ book, onDelete }: Props) {
 
   const gradient = GENRE_GRADIENTS[book.genre] ?? GENRE_GRADIENTS.Other
   const glyph = GENRE_GLYPHS[book.genre] ?? GENRE_GLYPHS.Other
+  const href = `/books/${book.id}`
+
+  // Navigate programmatically so action buttons can stopPropagation cleanly
+  function navigateToBook() {
+    router.push(href)
+  }
+
+  function stopAndRun(fn: () => void) {
+    return (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      fn()
+    }
+  }
 
   function handleDelete(e: React.MouseEvent) {
     e.preventDefault()
@@ -60,17 +85,95 @@ export function BookCard({ book, onDelete }: Props) {
     }
   }
 
-  return (
-    <Link
-      href={`/books/${book.id}`}
-      className="group relative flex flex-col rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-all duration-200 hover:shadow-[0_0_24px_rgba(120,80,40,0.1)]"
-      onMouseLeave={() => setConfirmDelete(false)}
-    >
-      {/* Cover */}
-      <div className={`relative h-32 bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
-        <span className="text-5xl opacity-20 select-none">{glyph}</span>
-        <div className="absolute inset-0 bg-gradient-to-t from-card/60 to-transparent" />
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
 
+    setUploading(true)
+    setUploadError('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/books/${book.id}/cover`, { method: 'POST', body: fd })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? 'Upload failed')
+      }
+      const { cover_image } = await res.json()
+      setCoverImage(cover_image)
+      setCoverVersion(Date.now())
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function removeCover() {
+    await fetch(`/api/books/${book.id}/cover`, { method: 'DELETE' })
+    setCoverImage(null)
+  }
+
+  return (
+    <div
+      className="group relative flex flex-col rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-all duration-200 hover:shadow-[0_0_24px_rgba(120,80,40,0.1)] cursor-pointer"
+      onMouseLeave={() => { setConfirmDelete(false); setUploadError('') }}
+    >
+      {/* ── Cover ── */}
+      <div
+        className={`relative h-32 flex items-center justify-center shrink-0 overflow-hidden ${
+          coverImage ? 'bg-zinc-900' : `bg-gradient-to-br ${gradient}`
+        }`}
+        onClick={(e) => {
+          // Don't navigate if a button or the file input triggered this click
+          if ((e.target as HTMLElement).closest('button, input')) return
+          navigateToBook()
+        }}
+      >
+        {coverImage ? (
+          <img
+            src={`${coverImage}?v=${coverVersion}`}
+            alt={book.title}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <>
+            <span className="text-5xl opacity-20 select-none">{glyph}</span>
+            <div className="absolute inset-0 bg-gradient-to-t from-card/60 to-transparent" />
+          </>
+        )}
+
+        {/* Cover photo actions */}
+        {!isMock && (
+          <>
+            <button
+              onClick={stopAndRun(() => fileInputRef.current?.click())}
+              disabled={uploading}
+              title={coverImage ? 'Change cover photo' : 'Add cover photo'}
+              className={`absolute bottom-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-all duration-150 ${
+                uploading
+                  ? 'bg-black/60 text-zinc-300 opacity-100 cursor-wait'
+                  : 'bg-black/50 text-zinc-200 opacity-0 group-hover:opacity-100 hover:bg-black/70'
+              }`}
+            >
+              <Camera size={11} />
+              {uploading ? 'Uploading…' : coverImage ? 'Change' : 'Add cover'}
+            </button>
+
+            {coverImage && !uploading && (
+              <button
+                onClick={stopAndRun(removeCover)}
+                title="Remove cover"
+                className="absolute bottom-2 right-2 p-1 rounded bg-black/50 text-zinc-300 opacity-0 group-hover:opacity-100 hover:bg-black/70 transition-all duration-150"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Delete book */}
         {onDelete && (
           <button
             onClick={handleDelete}
@@ -84,10 +187,19 @@ export function BookCard({ book, onDelete }: Props) {
             <Trash2 size={13} />
           </button>
         )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onClick={(e) => e.stopPropagation()}
+          onChange={handleFileChange}
+        />
       </div>
 
-      {/* Body */}
-      <div className="flex flex-col flex-1 p-4 gap-2">
+      {/* ── Body — keep as Link for right-click / open-in-tab ── */}
+      <Link href={href} className="flex flex-col flex-1 p-4 gap-2">
         <div className="flex items-start justify-between gap-2">
           <h2 className="font-semibold text-base leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-1">
             {book.title}
@@ -100,6 +212,10 @@ export function BookCard({ book, onDelete }: Props) {
         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 flex-1">
           {book.logline ?? book.premise ?? 'No description yet.'}
         </p>
+
+        {uploadError && (
+          <p className="text-[11px] text-destructive">{uploadError}</p>
+        )}
 
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
           {book.word_count > 0 ? (
@@ -114,7 +230,7 @@ export function BookCard({ book, onDelete }: Props) {
             {relativeDate ? `Updated ${relativeDate}` : ''}
           </span>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   )
 }

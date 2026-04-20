@@ -110,6 +110,9 @@ function createDb(): Database.Database {
     );
   `)
 
+  // Non-destructive migrations
+  try { sqlite.exec(`ALTER TABLE books ADD COLUMN cover_image TEXT`) } catch { /* already exists */ }
+
   return sqlite
 }
 

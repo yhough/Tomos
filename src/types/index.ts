@@ -30,6 +30,7 @@ export interface Book {
   protagonist_description: string | null
   logline: string | null
   word_count: number
+  cover_image: string | null
   created_at: number
   updated_at: number
 }

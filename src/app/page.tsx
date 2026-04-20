@@ -17,6 +17,7 @@ const MOCK_BOOK_CARD: Book = {
   protagonist_description: null,
   logline: mockBook.logline,
   word_count: 13_891,
+  cover_image: null,
   created_at: new Date('2024-01-10').getTime(),
   updated_at: new Date('2024-01-14').getTime(),
 }
