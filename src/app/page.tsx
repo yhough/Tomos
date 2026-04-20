@@ -3,7 +3,7 @@
 import { BookCard } from '@/components/BookCard'
 import { mockBook, MOCK_BOOK_ID } from '@/lib/mock-data'
 import type { Book } from '@/types'
-import { BookOpen, Clock, Home, Library, Plus, Settings, Sparkles } from 'lucide-react'
+import { BookOpen, Clock, Home, Library, Plus, Search, Settings, Sparkles, X } from 'lucide-react'
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -177,9 +177,15 @@ function LibraryTab({
   loading: boolean
   onDelete: (id: string) => void
 }) {
+  const [query, setQuery] = useState('')
+
+  const filtered = query.trim()
+    ? books.filter((b) => b.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : books
+
   return (
     <div className="px-8 py-12">
-      <div className="mb-8 flex items-end justify-between">
+      <div className="mb-6 flex items-start justify-between gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
           {!loading && (
@@ -188,15 +194,46 @@ function LibraryTab({
             </p>
           )}
         </div>
+
+        {/* Search bar */}
+        {!loading && books.length > 0 && (
+          <div className="relative w-64 shrink-0">
+            <Search
+              size={13}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search titles…"
+              className="w-full pl-8 pr-8 py-2 rounded-md border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
       ) : books.length === 0 ? (
         <EmptyState />
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center py-20 text-center">
+          <Search size={32} className="text-muted-foreground/40 mb-4" />
+          <p className="text-sm font-medium text-foreground">No results for &ldquo;{query}&rdquo;</p>
+          <p className="text-sm text-muted-foreground mt-1">Try a different title.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {books.map((book) => (
+          {filtered.map((book) => (
             <BookCard key={book.id} book={book} onDelete={onDelete} />
           ))}
         </div>
