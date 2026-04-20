@@ -1,9 +1,11 @@
 'use client'
 
+import { CharacterCard } from '@/components/CharacterCard'
+import { CharacterDetailSlideOver, type CharacterFull } from '@/components/CharacterDetailSlideOver'
 import { LoreSidebar, type LoreSidebarHandle } from '@/components/LoreSidebar'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { WorldMessage, type WorldMessageData } from '@/components/WorldMessage'
-import { mockBook, mockLoreSections, mockMessages, MOCK_BOOK_ID } from '@/lib/mock-data'
+import { mockBook, mockCharacters, mockLoreSections, mockMessages, MOCK_BOOK_ID } from '@/lib/mock-data'
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
@@ -233,13 +235,48 @@ function WorldTab({ bookId }: { bookId: string }) {
   )
 }
 
-// ── Other tab placeholders ────────────────────────────────────────────────────
+// ── Characters tab ────────────────────────────────────────────────────────────
 
 function CharactersTab({ bookId }: { bookId: string }) {
+  const isMock = bookId === MOCK_BOOK_ID
+  const [characters, setCharacters] = useState<CharacterFull[]>(isMock ? mockCharacters : [])
+  const [selected, setSelected] = useState<CharacterFull | null>(null)
+
+  useEffect(() => {
+    if (isMock) return
+    fetch(`/api/books/${bookId}/characters`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setCharacters)
+      .catch(() => {})
+  }, [bookId, isMock])
+
   return (
-    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-      Characters tab coming soon. Book ID: {bookId}
-    </div>
+    <>
+      <div className="h-full overflow-y-auto">
+        {characters.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">
+              No characters yet — they'll appear here as you build the world.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4 p-8">
+            {characters.map((char) => (
+              <CharacterCard
+                key={char.id}
+                character={char}
+                onClick={() => setSelected(char)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <CharacterDetailSlideOver
+        character={selected}
+        onClose={() => setSelected(null)}
+      />
+    </>
   )
 }
 

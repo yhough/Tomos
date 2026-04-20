@@ -1,7 +1,92 @@
 import type { WorldMessageData } from '@/components/WorldMessage'
 import type { LoreEntry } from '@/components/LoreSlideOver'
+import type { CharacterFull } from '@/components/CharacterDetailSlideOver'
 
 export const MOCK_BOOK_ID = 'mock-book-1'
+
+// ── Characters ────────────────────────────────────────────────────────────────
+
+export const mockCharacters: CharacterFull[] = [
+  {
+    id: 'char-1',
+    name: 'Kael Ardenvoss',
+    role: 'protagonist',
+    status: 'alive',
+    description:
+      'A disgraced general who vanished three months ago after intercepting a courier meant for the Threadweavers. He carries a secret that could expose the society — and end him.',
+    arc_status: 'Hunted. Moving south through the Eastern Provinces toward the Scholar\'s Quarter.',
+    data: JSON.stringify({
+      traits: ['Methodical', 'Haunted', 'Loyal to a fault', 'Tactically brilliant'],
+      relationships: [
+        { character_name: 'Queen Isaveth', description: 'His former liege. She signed his disgrace. He still believes in the empire she was supposed to be.' },
+        { character_name: 'Renara Voss', description: 'Unknown to each other. Their paths have not yet crossed.' },
+      ],
+      notable_moments: [
+        'Intercepted and read a Threadweaver courier — the first outsider to learn of their existence in a decade.',
+        'Survived three assassination attempts since going dark.',
+        'Left his general\'s signet at the wreckage of the Ashwall Gate as a message to whoever was following him.',
+      ],
+    }),
+  },
+  {
+    id: 'char-2',
+    name: 'Queen Isaveth Vranel',
+    role: 'antagonist',
+    status: 'alive',
+    description:
+      'The third monarch to rely on the Threadweavers. She does not know how deep their roots go — only that the price of their loyalty has been climbing for years.',
+    arc_status: 'Consolidating power while quietly terrified of what Kael knows.',
+    data: JSON.stringify({
+      traits: ['Calculating', 'Publicly gracious', 'Privately paranoid', 'Pragmatic'],
+      relationships: [
+        { character_name: 'Kael Ardenvoss', description: 'She disgraced him to protect the Threadweavers. She is not certain she made the right call.' },
+        { character_name: 'Lord Therin Mast', description: 'She tolerates his autonomy because the Eastern Provinces are too costly to discipline right now.' },
+      ],
+      notable_moments: [
+        'Doubled the Valdris garrison on the advice of her Threadweaver handler — without knowing the real reason.',
+        'Personally reviewed and approved Kael\'s arrest warrant, then destroyed her own copy.',
+      ],
+    }),
+  },
+  {
+    id: 'char-3',
+    name: 'Renara Voss',
+    role: 'supporting',
+    status: 'alive',
+    description:
+      'Guildmaster of the Merchant\'s Consortium. Built her power on neutrality and information. Currently watching the empire\'s behavior with growing concern and growing opportunity.',
+    arc_status: 'Neutral — but accumulating leverage as the empire grows desperate.',
+    data: JSON.stringify({
+      traits: ['Patient', 'Brilliant networker', 'Ruthlessly transactional', 'Privately principled'],
+      relationships: [
+        { character_name: 'Queen Isaveth Vranel', description: 'A business relationship. The Queen buys Consortium neutrality; Voss sells it at a premium.' },
+      ],
+      notable_moments: [
+        'Her informants noticed the Threadweaver network activating across the Scholar\'s Quarter — she doesn\'t know why yet.',
+        'Quietly rerouted three northern trade ships after the early winter storms, personally absorbing the loss to keep member houses loyal.',
+      ],
+    }),
+  },
+  {
+    id: 'char-4',
+    name: 'Lord Therin Mast',
+    role: 'supporting',
+    status: 'alive',
+    description:
+      'Governor of the Eastern Provinces. A pragmatist who has kept his territory stable by knowing when to look the other way — and when not to.',
+    arc_status: 'Unaware that Kael is in his territory. When he finds out, the calculus changes.',
+    data: JSON.stringify({
+      traits: ['Pragmatic', 'Quietly ambitious', 'Protective of his people', 'Skeptical of Valdris'],
+      relationships: [
+        { character_name: 'Queen Isaveth Vranel', description: 'Pays tribute. Resists overreach. A managed tension.' },
+        { character_name: 'Kael Ardenvoss', description: 'They served together during the northern campaigns. Mast owes him a debt.' },
+      ],
+      notable_moments: [
+        'Refused a direct imperial request to quarter two legions in his provinces — and got away with it.',
+      ],
+    }),
+  },
+]
 
 export const mockBook = {
   id: MOCK_BOOK_ID,
