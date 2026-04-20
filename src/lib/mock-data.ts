@@ -533,18 +533,6 @@ export const mockProcessingSteps = [
 // -- Mock Timeline Events ----------
 export const mockTimelineEvents = [
   {
-    id: "tl-correction-1",
-    title: "Kael's Arrival Corrected: Horseback → On Foot",
-    description:
-      "Corrected: Kael arrives on horseback in Chapter 3 → Kael arrives on foot in Chapter 3, having released his horse after the courier confrontation to avoid being tracked.",
-    source: "world_chat",
-    inStoryDate: null,
-    category: "correction",
-    isCorrection: true,
-    characters: ["Kael Ardenvoss"],
-    createdAt: new Date("2024-01-15T09:10:10"),
-  },
-  {
     id: "tl-1",
     title: "The War of 412 — Ashwall Gate Destroyed",
     description:

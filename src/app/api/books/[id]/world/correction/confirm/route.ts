@@ -136,26 +136,6 @@ export async function POST(
       now
     )
 
-    // ── Create TimelineEvent ──────────────────────────────────────────────────
-    const maxOrder = (
-      db.prepare('SELECT MAX(sort_order) as m FROM timeline_events WHERE book_id = ?')
-        .get(params.id) as { m: number | null }
-    )?.m ?? 0
-
-    db.prepare(
-      `INSERT INTO timeline_events
-         (id, book_id, title, description, source, source_id, in_story_date, sort_order, created_at, category, is_correction)
-       VALUES (?, ?, ?, ?, 'chat', ?, NULL, ?, ?, 'correction', 1)`
-    ).run(
-      generateId(),
-      params.id,
-      correctionData.summary,
-      `Corrected: ${correctionData.whatChanged} → ${correctionData.whatItBecomes}`,
-      worldMessageId,
-      maxOrder + 1,
-      now
-    )
-
     // ── Update WorldMessage status ────────────────────────────────────────────
     db.prepare("UPDATE chat_messages SET correction_status = 'confirmed' WHERE id = ?")
       .run(worldMessageId)
