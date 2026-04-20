@@ -14,6 +14,7 @@ interface Props {
   onToggleChapter: (id: string) => void
   sortBy: SortBy
   onSortChange: (value: SortBy) => void
+  onResolveViaChat?: (chapterNumber: number, flagDescription: string) => void
 }
 
 export function ChapterList({
@@ -23,6 +24,7 @@ export function ChapterList({
   onToggleChapter,
   sortBy,
   onSortChange,
+  onResolveViaChat,
 }: Props) {
   const processedCount = chapters.filter((c) => c.processed).length
 
@@ -123,6 +125,7 @@ export function ChapterList({
             bookId={bookId}
             isExpanded={expandedChapterId === chapter.id}
             onToggle={() => onToggleChapter(chapter.id)}
+            onResolveViaChat={onResolveViaChat}
           />
         ))}
       </div>

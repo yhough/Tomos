@@ -107,6 +107,16 @@ function createDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS correction_records (
+      id TEXT PRIMARY KEY,
+      book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      world_message_id TEXT NOT NULL REFERENCES chat_messages(id),
+      summary TEXT NOT NULL,
+      affected_entities TEXT NOT NULL DEFAULT '{}',
+      diff TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS continuity_flags (
       id TEXT PRIMARY KEY,
       chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
@@ -122,6 +132,12 @@ function createDb(): Database.Database {
   try { sqlite.exec(`ALTER TABLE books ADD COLUMN cover_image TEXT`) } catch { /* already exists */ }
   try { sqlite.exec(`ALTER TABLE timeline_events ADD COLUMN category TEXT NOT NULL DEFAULT 'history'`) } catch { /* already exists */ }
   try { sqlite.exec(`ALTER TABLE timeline_events ADD COLUMN characters TEXT NOT NULL DEFAULT '[]'`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE timeline_events ADD COLUMN is_correction INTEGER NOT NULL DEFAULT 0`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE chat_messages ADD COLUMN is_correction INTEGER NOT NULL DEFAULT 0`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE chat_messages ADD COLUMN correction_status TEXT`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE chat_messages ADD COLUMN correction_data TEXT`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE chapters ADD COLUMN correction_notes TEXT NOT NULL DEFAULT '[]'`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE continuity_flags ADD COLUMN resolved_by TEXT`) } catch { /* already exists */ }
 
   return sqlite
 }

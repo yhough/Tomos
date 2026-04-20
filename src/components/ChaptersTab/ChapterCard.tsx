@@ -1,7 +1,7 @@
 'use client'
 
 import { mockChapters, MOCK_BOOK_ID } from '@/lib/mock-data'
-import { AlertTriangle, Info, PenLine, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Edit3, Info, PenLine, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 type Chapter = typeof mockChapters[0]
@@ -17,6 +17,7 @@ interface Props {
   bookId: string
   isExpanded: boolean
   onToggle: () => void
+  onResolveViaChat?: (chapterNumber: number, flagDescription: string) => void
 }
 
 function formatDate(date: Date) {
@@ -31,6 +32,12 @@ function formatAnnotationTime(ts: number) {
 
 function formatNumber(n: number) {
   return n.toLocaleString('en-US')
+}
+
+function formatCorrectionTime(iso: string) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  }).format(new Date(iso))
 }
 
 const btn: React.CSSProperties = {
@@ -51,8 +58,9 @@ function StatusBadge({ chapter }: { chapter: Chapter }) {
       </span>
     )
   }
-  const errors = chapter.flags.filter((f) => f.severity === 'error')
-  const warnings = chapter.flags.filter((f) => f.severity === 'warning')
+  const unresolvedFlags = chapter.flags.filter((f) => !f.resolved)
+  const errors = unresolvedFlags.filter((f) => f.severity === 'error')
+  const warnings = unresolvedFlags.filter((f) => f.severity === 'warning')
   if (errors.length > 0) {
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'hsl(var(--grimm-danger) / 0.12)', color: 'hsl(var(--grimm-danger))', fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 500 }}>
@@ -74,13 +82,19 @@ function StatusBadge({ chapter }: { chapter: Chapter }) {
   )
 }
 
-export function ChapterCard({ chapter, bookId, isExpanded, onToggle }: Props) {
+export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveViaChat }: Props) {
   const isMock = bookId === MOCK_BOOK_ID
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [addingNote, setAddingNote] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [resolvedFlagsOpen, setResolvedFlagsOpen] = useState(false)
+  const [showAllNotes, setShowAllNotes] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const unresolvedFlags = chapter.flags.filter((f) => !f.resolved)
+  const resolvedFlags = chapter.flags.filter((f) => f.resolved)
+  const correctionNotes = chapter.correctionNotes ?? []
 
   // Fetch annotations when card first expands (real books only)
   useEffect(() => {
@@ -175,7 +189,7 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle }: Props) {
       </div>
 
       {/* ── Expandable content ── */}
-      <div style={{ maxHeight: isExpanded ? 2000 : 0, overflow: 'hidden', transition: 'max-height 250ms ease' }}>
+      <div style={{ maxHeight: isExpanded ? 3000 : 0, overflow: 'hidden', transition: 'max-height 350ms ease' }}>
         <div style={{ opacity: isExpanded ? 1 : 0, transform: isExpanded ? 'translateY(0)' : 'translateY(4px)', transition: isExpanded ? 'opacity 200ms ease 50ms, transform 200ms ease 50ms' : 'none' }}>
           <div style={{ height: '0.5px', backgroundColor: 'hsl(var(--grimm-border))' }} />
 
@@ -203,13 +217,50 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle }: Props) {
                 </div>
               )}
 
+              {/* Correction notes */}
+              {correctionNotes.length > 0 && (
+                <div style={{ padding: '0 20px 16px', borderTop: '0.5px solid hsl(var(--grimm-border))', paddingTop: 14 }}>
+                  <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                    Corrections applied
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {(showAllNotes ? correctionNotes : correctionNotes.slice(0, 3)).map((note) => (
+                      <div
+                        key={note.id}
+                        style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, minWidth: 0 }}>
+                          <Edit3 size={11} style={{ color: 'hsl(var(--grimm-muted))', flexShrink: 0, marginTop: 2 }} />
+                          <span style={{ color: 'hsl(var(--grimm-muted))', fontSize: 12, lineHeight: 1.5 }}>
+                            {note.summary}
+                          </span>
+                        </div>
+                        <span style={{ color: 'hsl(var(--grimm-muted))', fontSize: 11, flexShrink: 0, opacity: 0.7 }}>
+                          {formatCorrectionTime(note.appliedAt)}
+                        </span>
+                      </div>
+                    ))}
+                    {correctionNotes.length > 3 && !showAllNotes && (
+                      <button
+                        onClick={() => setShowAllNotes(true)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'hsl(var(--grimm-accent))', fontSize: 12, padding: 0, textAlign: 'left' }}
+                      >
+                        Show all {correctionNotes.length} corrections
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Continuity flags */}
               {chapter.flags.length > 0 && (
                 <div style={{ padding: '0 20px 20px' }}>
                   <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
                     Continuity flags
                   </p>
-                  {chapter.flags.map((flag) => {
+
+                  {/* Unresolved flags */}
+                  {unresolvedFlags.map((flag) => {
                     const isError = flag.severity === 'error'
                     return (
                       <div key={flag.id} style={{ backgroundColor: isError ? 'hsl(var(--grimm-danger) / 0.1)' : 'hsl(var(--grimm-accent) / 0.1)', borderLeft: `3px solid hsl(var(--grimm-${isError ? 'danger' : 'accent'}))`, borderRadius: '0 6px 6px 0', padding: '10px 14px', marginBottom: 8 }}>
@@ -225,9 +276,62 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle }: Props) {
                         <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>
                           {flag.description}
                         </p>
+                        {onResolveViaChat && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onResolveViaChat(chapter.number, flag.description)
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'hsl(var(--grimm-accent))', fontSize: 12, padding: '4px 0 0', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                          >
+                            Resolve via chat →
+                          </button>
+                        )}
                       </div>
                     )
                   })}
+
+                  {/* Resolved flags — collapsible */}
+                  {resolvedFlags.length > 0 && (
+                    <div style={{ marginTop: unresolvedFlags.length > 0 ? 8 : 0 }}>
+                      <button
+                        onClick={() => setResolvedFlagsOpen((o) => !o)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, color: 'hsl(var(--grimm-muted))', fontSize: 12, padding: '4px 0', marginBottom: resolvedFlagsOpen ? 8 : 0 }}
+                      >
+                        {resolvedFlagsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        Resolved flags ({resolvedFlags.length})
+                      </button>
+
+                      {resolvedFlagsOpen && resolvedFlags.map((flag) => (
+                        <div
+                          key={flag.id}
+                          style={{
+                            backgroundColor: 'hsl(var(--grimm-success) / 0.4)',
+                            borderLeft: '3px solid hsl(var(--grimm-success-text) / 0.5)',
+                            borderRadius: '0 6px 6px 0',
+                            padding: '10px 14px',
+                            marginBottom: 8,
+                            opacity: 0.8,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Check size={12} style={{ color: 'hsl(var(--grimm-success-text))', flexShrink: 0 }} />
+                              <span style={{ color: 'hsl(var(--grimm-success-text))', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
+                                {flag.severity === 'error' ? 'Continuity error' : 'Worth checking'}
+                              </span>
+                            </div>
+                            <span style={{ backgroundColor: 'hsl(var(--grimm-success))', color: 'hsl(var(--grimm-success-text))', fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500, flexShrink: 0 }}>
+                              Resolved
+                            </span>
+                          </div>
+                          <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>
+                            {flag.description}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </>

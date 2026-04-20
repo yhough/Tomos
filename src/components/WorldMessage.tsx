@@ -2,7 +2,8 @@
 
 import { ContradictionAlert } from '@/components/ContradictionAlert'
 import { RippleCardItem } from '@/components/RippleCardItem'
-import type { ChatMetadata, Contradiction } from '@/types'
+import { CorrectionConfirmCard } from '@/components/WorldTab/CorrectionConfirmCard'
+import type { ChatMetadata, Contradiction, CorrectionStatus } from '@/types'
 
 interface RippleCard {
   id: string
@@ -26,6 +27,9 @@ interface Props {
   onRippleAccepted: () => void
   onContradictionOverride?: (messageId: string) => void
   onContradictionCancel?: (messageId: string) => void
+  onCorrectionConfirm?: () => void
+  onCorrectionCancel?: () => void
+  isConfirming?: boolean
 }
 
 export function WorldMessage({
@@ -34,12 +38,19 @@ export function WorldMessage({
   onRippleAccepted,
   onContradictionOverride,
   onContradictionCancel,
+  onCorrectionConfirm,
+  onCorrectionCancel,
+  isConfirming,
 }: Props) {
   let meta: ChatMetadata = {}
   try { meta = JSON.parse(message.metadata) } catch { /* ok */ }
 
   const contradictions: Contradiction[] = meta.contradictions ?? []
   const pendingRipples = message.ripple_cards.filter((c) => c.status !== 'dismissed')
+
+  const isCorrection = meta.input_type === 'correction' || meta.is_correction === true
+  const correctionStatus = (meta.correction_status ?? 'pending_confirmation') as CorrectionStatus
+  const correctionData = meta.correction_data
 
   if (message.role === 'user') {
     return (
@@ -51,7 +62,40 @@ export function WorldMessage({
     )
   }
 
-  // AI message
+  // Correction AI message
+  if (isCorrection && correctionData) {
+    return (
+      <div className="flex flex-col gap-3">
+        {/* AI response bubble with left border accent */}
+        <div className="flex items-start gap-3 max-w-[75%]">
+          <div
+            className="px-4 py-3 rounded-2xl rounded-tl-sm bg-card border border-border text-sm leading-relaxed text-foreground"
+            style={{
+              fontFamily: 'var(--font-playfair)',
+              fontStyle: 'italic',
+              borderLeftWidth: '3px',
+              borderLeftColor: 'rgb(148 163 184 / 0.8)',
+            }}
+          >
+            {message.content}
+          </div>
+        </div>
+
+        {/* Correction confirm card */}
+        <div className="max-w-[75%]">
+          <CorrectionConfirmCard
+            correctionData={correctionData}
+            status={correctionStatus}
+            isConfirming={isConfirming ?? false}
+            onConfirm={onCorrectionConfirm ?? (() => {})}
+            onCancel={onCorrectionCancel ?? (() => {})}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Regular AI message
   return (
     <div className="flex flex-col gap-3">
       {/* Contradiction alert — above response */}

@@ -71,31 +71,41 @@ When the writer asks a question:
 - Label any inference or speculation explicitly with "Speculation:"
 - Set input_type to "question"
 
-ALWAYS respond with valid JSON matching this exact schema — no markdown, no commentary, just JSON:
+When the writer is making a CORRECTION to previously established canon:
+- Detect signals: words like "actually", "correction", "change", "fix", "I meant", "revise", past-tense negations of established facts ("Kael didn't...", "that's wrong"), explicit chapter references ("in chapter 3...")
+- Set input_type to "correction"
+- Do NOT log any lore updates yet — wait for confirmation
+- Write a warm confirmation message summarising the change and asking the writer to approve
+- Include a structured correction_data object
+
+ALWAYS respond with valid JSON — no markdown, no commentary, just JSON:
 {
-  "response": "string — your narrative reply to the writer",
-  "input_type": "fact" | "event" | "question",
-  "state_updates": [
-    {
-      "type": "world_fact" | "location" | "faction" | "event" | "misc" | "character",
-      "name": "string",
-      "action": "create" | "update",
-      "summary": "string — 1–2 sentence display summary",
-      "data": {}
+  "response": "string",
+  "input_type": "fact" | "event" | "question" | "correction",
+  "state_updates": [...],
+  "ripple_effects": [...],
+  "contradictions": [...],
+  "timeline_event": {...} | null,
+  "correction_data": {
+    "summary": "one sentence describing what is being corrected",
+    "whatChanged": "plain English description of the old fact",
+    "whatItBecomes": "plain English description of the new fact",
+    "affectedEntities": {
+      "loreEntries": ["name of affected lore entry"],
+      "characters": ["name of affected character"],
+      "chapterFlags": ["flag id if known"],
+      "chapterSummaries": [3]
+    },
+    "proposedDiff": {
+      "loreEntryUpdates": [{ "name": "...", "field": "...", "oldValue": "...", "newValue": "..." }],
+      "characterUpdates": [{ "name": "...", "field": "...", "oldValue": "...", "newValue": "..." }],
+      "chapterSummaryUpdates": [{ "chapterNumber": 3, "oldSentence": "exact sentence", "newSentence": "replacement" }],
+      "flagsToResolve": ["flag-id"]
     }
-  ],
-  "ripple_effects": [
-    { "title": "string", "description": "string" }
-  ],
-  "contradictions": [
-    {
-      "description": "string — what contradicts what",
-      "existing": "string — the established fact being contradicted",
-      "resolution_options": ["string"]
-    }
-  ],
-  "timeline_event": { "title": "string", "description": "string", "in_story_date": "string | null" } | null
-}`
+  } | null
+}
+
+For non-correction inputs, correction_data should be null. For corrections, state_updates and ripple_effects should be empty arrays.`
 }
 
 export async function POST(
@@ -162,6 +172,23 @@ export async function POST(
       ripple_effects: Array<{ title: string; description: string }>
       contradictions: Array<{ description: string; existing: string; resolution_options: string[] }>
       timeline_event?: { title: string; description: string; in_story_date?: string } | null
+      correction_data?: {
+        summary: string
+        whatChanged: string
+        whatItBecomes: string
+        affectedEntities: {
+          loreEntries: string[]
+          characters: string[]
+          chapterFlags: string[]
+          chapterSummaries: number[]
+        }
+        proposedDiff: {
+          loreEntryUpdates: Array<{ name: string; field: string; oldValue: string; newValue: string }>
+          characterUpdates: Array<{ name: string; field: string; oldValue: string; newValue: string }>
+          chapterSummaryUpdates: Array<{ chapterNumber: number; oldSentence: string; newSentence: string }>
+          flagsToResolve: string[]
+        }
+      } | null
     }
 
     try {
@@ -187,23 +214,43 @@ export async function POST(
     ).run(userMsgId, params.id, content.trim(), now)
 
     const hasContradictions = (parsed.contradictions ?? []).length > 0
+    const isCorrection = parsed.input_type === 'correction'
 
-    // Save assistant message with metadata
-    const metadata = JSON.stringify({
-      input_type: parsed.input_type,
-      state_updates: hasContradictions ? [] : (parsed.state_updates ?? []),
-      contradictions: parsed.contradictions ?? [],
-    })
+    // Build metadata — corrections get their own shape
+    const metadata = isCorrection
+      ? JSON.stringify({
+          input_type: 'correction',
+          is_correction: true,
+          correction_status: 'pending_confirmation',
+          correction_data: parsed.correction_data ?? null,
+          state_updates: [],
+          contradictions: [],
+        })
+      : JSON.stringify({
+          input_type: parsed.input_type,
+          state_updates: hasContradictions ? [] : (parsed.state_updates ?? []),
+          contradictions: parsed.contradictions ?? [],
+        })
 
-    db.prepare(
-      `INSERT INTO chat_messages (id, book_id, character_id, role, content, metadata, created_at)
-       VALUES (?, ?, NULL, 'assistant', ?, ?, ?)`
-    ).run(assistantMsgId, params.id, parsed.response ?? '', metadata, now + 1)
+    if (isCorrection) {
+      db.prepare(
+        `INSERT INTO chat_messages (id, book_id, character_id, role, content, metadata, is_correction, correction_status, correction_data, created_at)
+         VALUES (?, ?, NULL, 'assistant', ?, ?, 1, 'pending_confirmation', ?, ?)`
+      ).run(
+        assistantMsgId, params.id, parsed.response ?? '', metadata,
+        JSON.stringify(parsed.correction_data ?? {}), now + 1
+      )
+    } else {
+      db.prepare(
+        `INSERT INTO chat_messages (id, book_id, character_id, role, content, metadata, created_at)
+         VALUES (?, ?, NULL, 'assistant', ?, ?, ?)`
+      ).run(assistantMsgId, params.id, parsed.response ?? '', metadata, now + 1)
+    }
 
     let rippleCards: Array<{ id: string; title: string; description: string; status: string }> = []
 
-    // If no contradictions, persist lore and ripples
-    if (!hasContradictions) {
+    // If no contradictions and not a correction, persist lore and ripples
+    if (!hasContradictions && !isCorrection) {
       // Upsert state entries
       for (const update of parsed.state_updates ?? []) {
         if (update.type === 'character') {

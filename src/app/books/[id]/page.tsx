@@ -10,9 +10,11 @@ import { TypingIndicator } from '@/components/TypingIndicator'
 import { WorldMessage, type WorldMessageData } from '@/components/WorldMessage'
 import { mockBook, mockChapters, mockCharacters, mockLoreSections, mockMessages, mockProcessingSteps, MOCK_BOOK_ID } from '@/lib/mock-data'
 import { useTheme } from '@/hooks/useTheme'
+import type { ChatMetadata } from '@/types'
 import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Moon, Sparkles, Sun, Upload, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 type Tab = 'world' | 'characters' | 'chapters' | 'timeline'
 
@@ -29,7 +31,14 @@ interface Props {
 
 export default function BookPage({ params }: Props) {
   const [tab, setTab] = useState<Tab>('world')
+  const [preFillMessage, setPreFillMessage] = useState<string | null>(null)
   const { dark, toggle: toggleTheme } = useTheme()
+
+  function handleResolveViaChat(chapterNumber: number, flagDescription: string) {
+    const words = flagDescription.split(' ').slice(0, 10).join(' ')
+    setPreFillMessage(`Regarding the continuity flag in Chapter ${chapterNumber} — ${words}...`)
+    setTab('world')
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -68,9 +77,20 @@ export default function BookPage({ params }: Props) {
 
       {/* Tab content — fills remaining height, no outer scroll */}
       <div className="flex-1 min-h-0">
-        {tab === 'world' && <WorldTab bookId={params.id} />}
+        {tab === 'world' && (
+          <WorldTab
+            bookId={params.id}
+            preFillMessage={preFillMessage}
+            onPreFillConsumed={() => setPreFillMessage(null)}
+          />
+        )}
         {tab === 'characters' && <CharactersTab bookId={params.id} />}
-        {tab === 'chapters' && <ChaptersTab bookId={params.id} />}
+        {tab === 'chapters' && (
+          <ChaptersTab
+            bookId={params.id}
+            onResolveViaChat={handleResolveViaChat}
+          />
+        )}
         {tab === 'timeline' && <TimelineTab bookId={params.id} />}
       </div>
     </div>
@@ -79,7 +99,15 @@ export default function BookPage({ params }: Props) {
 
 // ── World tab ─────────────────────────────────────────────────────────────────
 
-function WorldTab({ bookId }: { bookId: string }) {
+function WorldTab({
+  bookId,
+  preFillMessage,
+  onPreFillConsumed,
+}: {
+  bookId: string
+  preFillMessage?: string | null
+  onPreFillConsumed?: () => void
+}) {
   const isMock = bookId === MOCK_BOOK_ID
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [logline, setLogline] = useState<string | null>(isMock ? mockBook.logline : null)
@@ -87,8 +115,10 @@ function WorldTab({ bookId }: { bookId: string }) {
   const [isTyping, setIsTyping] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [input, setInput] = useState('')
+  const [confirmingMessageId, setConfirmingMessageId] = useState<string | null>(null)
   const sidebarRef = useRef<LoreSidebarHandle>(null)
   const feedRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (isMock) return
@@ -111,6 +141,75 @@ function WorldTab({ bookId }: { bookId: string }) {
     const el = feedRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, isTyping])
+
+  // Pre-fill textarea when switching to world tab from chapters
+  useEffect(() => {
+    if (preFillMessage) {
+      setInput(preFillMessage)
+      onPreFillConsumed?.()
+      setTimeout(() => inputRef.current?.focus(), 80)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preFillMessage])
+
+  async function handleConfirmCorrection(messageId: string) {
+    const sourceMsg = messages.find((m) => m.id === messageId)
+
+    if (!isMock) {
+      setConfirmingMessageId(messageId)
+      try {
+        const res = await fetch(`/api/books/${bookId}/world/correction/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ worldMessageId: messageId }),
+        })
+        if (!res.ok) throw new Error()
+      } catch {
+        toast.error("Something went wrong — the correction wasn't applied. Try again.", { duration: 5000 })
+        setConfirmingMessageId(null)
+        return
+      }
+      setConfirmingMessageId(null)
+    }
+
+    // Update message metadata in local state
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== messageId) return m
+      let meta: ChatMetadata = {}
+      try { meta = JSON.parse(m.metadata) } catch { /* ok */ }
+      return { ...m, metadata: JSON.stringify({ ...meta, correction_status: 'confirmed' }) }
+    }))
+
+    sidebarRef.current?.refetch()
+
+    let summary = 'Correction applied'
+    if (sourceMsg) {
+      try {
+        const meta = JSON.parse(sourceMsg.metadata) as ChatMetadata
+        summary = meta.correction_data?.summary ?? summary
+      } catch { /* ok */ }
+    }
+    toast.success(summary, { duration: 4000 })
+  }
+
+  async function handleCancelCorrection(messageId: string) {
+    if (!isMock) {
+      try {
+        await fetch(`/api/books/${bookId}/world/correction/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ worldMessageId: messageId }),
+        })
+      } catch { /* silent — update UI regardless */ }
+    }
+
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== messageId) return m
+      let meta: ChatMetadata = {}
+      try { meta = JSON.parse(m.metadata) } catch { /* ok */ }
+      return { ...m, metadata: JSON.stringify({ ...meta, correction_status: 'cancelled' }) }
+    }))
+  }
 
   async function sendMessage() {
     const text = input.trim()
@@ -212,6 +311,9 @@ function WorldTab({ bookId }: { bookId: string }) {
                   message={msg}
                   bookId={bookId}
                   onRippleAccepted={handleRippleAccepted}
+                  onCorrectionConfirm={() => handleConfirmCorrection(msg.id)}
+                  onCorrectionCancel={() => handleCancelCorrection(msg.id)}
+                  isConfirming={confirmingMessageId === msg.id}
                 />
               ))
             )}
@@ -225,6 +327,7 @@ function WorldTab({ bookId }: { bookId: string }) {
             <p className="text-xs text-red-600 mb-2 px-1">{sendError}</p>
           )}
           <textarea
+            ref={inputRef}
             rows={1}
             value={input}
             onChange={(e) => { setInput(e.target.value); if (sendError) setSendError(null) }}
@@ -292,7 +395,13 @@ function CharactersTab({ bookId }: { bookId: string }) {
   )
 }
 
-function ChaptersTab({ bookId }: { bookId: string }) {
+function ChaptersTab({
+  bookId,
+  onResolveViaChat,
+}: {
+  bookId: string
+  onResolveViaChat?: (chapterNumber: number, flagDescription: string) => void
+}) {
   const isMock = bookId === MOCK_BOOK_ID
   const [uploadMode, setUploadMode] = useState<'paste' | 'file'>('paste')
   const [expandedChapterId, setExpandedChapterId] = useState<string | null>(isMock ? 'chapter-3' : null)
@@ -318,9 +427,9 @@ function ChaptersTab({ bookId }: { bookId: string }) {
 
   const processedChapters = chapters.filter((c) => c.processed)
   const totalWords = processedChapters.reduce((sum, c) => sum + c.wordCount, 0)
-  const totalFlags = chapters.reduce((sum, c) => sum + c.flags.length, 0)
-  const hasErrors = chapters.some((c) => c.flags.some((f) => f.severity === 'error'))
-  const hasWarnings = chapters.some((c) => c.flags.some((f) => f.severity === 'warning'))
+  const totalFlags = chapters.reduce((sum, c) => sum + c.flags.filter((f) => !f.resolved).length, 0)
+  const hasErrors = chapters.some((c) => c.flags.some((f) => f.severity === 'error' && !f.resolved))
+  const hasWarnings = chapters.some((c) => c.flags.some((f) => f.severity === 'warning' && !f.resolved))
 
   const flagIconColor = hasErrors
     ? 'hsl(var(--grimm-danger))'
@@ -618,6 +727,7 @@ function ChaptersTab({ bookId }: { bookId: string }) {
           }
           sortBy={sortBy}
           onSortChange={setSortBy}
+          onResolveViaChat={onResolveViaChat}
         />
       </div>
     </div>

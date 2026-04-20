@@ -1,6 +1,7 @@
 'use client'
 
 import { mockTimelineEvents, MOCK_BOOK_ID } from '@/lib/mock-data'
+import { Edit3 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -15,7 +16,10 @@ interface TimelineEvent {
   characters: string[]
   sortOrder: number
   createdAt: number
+  isCorrection: boolean
 }
+
+const CORRECTION_COLOR = '#6b7f8a'
 
 // ── Category config ───────────────────────────────────────────────────────────
 
@@ -28,6 +32,7 @@ const CATEGORY_STYLES: Record<string, { badge: string; border: string; label: st
   economic:   { badge: 'bg-green-100 text-green-700',     border: 'border-l-green-400',   label: 'Economic'    },
   magic:      { badge: 'bg-violet-100 text-violet-700',   border: 'border-l-violet-400',  label: 'Magic'       },
   history:    { badge: 'bg-zinc-100 text-zinc-600',       border: 'border-l-zinc-400',    label: 'History'     },
+  correction: { badge: 'bg-slate-100 text-slate-600',     border: 'border-l-slate-400',   label: 'Correction'  },
 }
 
 function categoryStyle(cat: string) {
@@ -58,6 +63,7 @@ function normaliseMock(e: (typeof mockTimelineEvents)[0], i: number): TimelineEv
     characters: e.characters,
     sortOrder: i,
     createdAt: e.createdAt instanceof Date ? e.createdAt.getTime() : Number(e.createdAt),
+    isCorrection: (e as { isCorrection?: boolean }).isCorrection ?? false,
   }
 }
 
@@ -72,6 +78,7 @@ function normaliseApi(e: Record<string, unknown>, i: number): TimelineEvent {
     characters: (() => { try { return JSON.parse(String(e.characters ?? '[]')) } catch { return [] } })(),
     sortOrder: Number(e.sort_order ?? i),
     createdAt: Number(e.created_at ?? 0),
+    isCorrection: Boolean(e.is_correction),
   }
 }
 
@@ -95,11 +102,34 @@ function categoryDot(cat: string) {
 // side: which side of the center line this card is on.
 // The accent border always faces the center line.
 function EventCard({ event, side }: { event: TimelineEvent; side: 'left' | 'right' }) {
-  const cs = categoryStyle(event.category)
-  const borderClass = side === 'left' ? `border-r-4 ${cs.border}` : `border-l-4 ${cs.border}`
+  const cs = categoryStyle(event.isCorrection ? 'correction' : event.category)
+  const correctionBorder = `border-[${CORRECTION_COLOR}]`
+  const borderClass = event.isCorrection
+    ? side === 'left'
+      ? 'border-r-4'
+      : 'border-l-4'
+    : side === 'left'
+    ? `border-r-4 ${cs.border}`
+    : `border-l-4 ${cs.border}`
 
   return (
-    <div className={`bg-card border border-border rounded-xl ${borderClass} px-5 py-4 flex flex-col gap-2`}>
+    <div
+      className={`bg-card border border-border rounded-xl ${borderClass} px-5 py-4 flex flex-col gap-2`}
+      style={event.isCorrection
+        ? side === 'left'
+          ? { borderRightColor: CORRECTION_COLOR }
+          : { borderLeftColor: CORRECTION_COLOR }
+        : undefined
+      }
+    >
+      {/* Correction header row */}
+      {event.isCorrection && (
+        <div className="flex items-center gap-1.5" style={{ color: CORRECTION_COLOR }}>
+          <Edit3 size={11} />
+          <span className="text-[10px] font-medium uppercase tracking-wider">Correction</span>
+        </div>
+      )}
+
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -108,9 +138,11 @@ function EventCard({ event, side }: { event: TimelineEvent; side: 'left' | 'righ
               {event.inStoryDate}
             </span>
           )}
-          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full capitalize ${cs.badge}`}>
-            {cs.label}
-          </span>
+          {!event.isCorrection && (
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full capitalize ${cs.badge}`}>
+              {cs.label}
+            </span>
+          )}
         </div>
         <span className="text-[11px] text-muted-foreground/60 shrink-0 mt-0.5">
           {formatSource(event.source)}
@@ -213,6 +245,7 @@ export function TimelineTab({ bookId }: Props) {
   const displayed = useMemo(() => {
     let out = events.filter((e) => {
       if (character !== 'all' && !e.characters.includes(character)) return false
+      if (category === 'corrections') return e.isCorrection
       if (category !== 'all' && e.category !== category) return false
       return true
     })
@@ -265,7 +298,8 @@ export function TimelineTab({ bookId }: Props) {
 
           <FilterSelect value={category} onChange={setCategory}>
             <option value="all">All categories</option>
-            {allCategories.map((c) => (
+            <option value="corrections">◆ Corrections</option>
+            {allCategories.filter((c) => c !== 'correction').map((c) => (
               <option key={c} value={c} className="capitalize">
                 {categoryStyle(c).label}
               </option>
@@ -311,8 +345,23 @@ export function TimelineTab({ bookId }: Props) {
                       {side === 'left' && <div className="w-full max-w-[380px]"><EventCard event={event} side="left" /></div>}
                     </div>
 
-                    {/* Center dot */}
-                    <div className={`relative z-10 shrink-0 w-3 h-3 rounded-full ${dot} ring-2 ring-background mt-5`} />
+                    {/* Center dot — diamond for corrections, circle otherwise */}
+                    {event.isCorrection ? (
+                      <div
+                        className="relative z-10 shrink-0 mt-5"
+                        style={{
+                          width: 12,
+                          height: 12,
+                          backgroundColor: CORRECTION_COLOR,
+                          transform: 'rotate(45deg)',
+                          outline: '2px solid hsl(var(--background))',
+                          outlineOffset: 1,
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div className={`relative z-10 shrink-0 w-3 h-3 rounded-full ${dot} ring-2 ring-background mt-5`} />
+                    )}
 
                     {/* Right half */}
                     <div className="flex-1">

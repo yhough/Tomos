@@ -290,9 +290,122 @@ export const mockMessages: WorldMessageData[] = [
     created_at: new Date('2024-01-15T09:08:20').getTime(),
     ripple_cards: [],
   },
+  // ── Correction flow demo — pending state ──────────────────────────────────
+  {
+    id: 'msg-8',
+    role: 'user',
+    content:
+      "Actually, Kael arrived on foot in chapter 3 — he had released his horse after the courier confrontation to avoid being tracked.",
+    metadata: '{}',
+    created_at: new Date('2024-01-15T09:10:00').getTime(),
+    ripple_cards: [],
+  },
+  {
+    id: 'msg-9',
+    role: 'assistant',
+    content:
+      "You're updating Kael's arrival in Chapter 3 from horseback to on foot — this will resolve the continuity flag about his horse and update the chapter summary. Shall I apply this change?",
+    metadata: JSON.stringify({
+      input_type: 'correction',
+      is_correction: true,
+      correction_status: 'pending_confirmation',
+      correction_data: {
+        summary: "Kael's arrival in Chapter 3 corrected from horseback to on foot",
+        whatChanged: 'Kael arrives on horseback in Chapter 3',
+        whatItBecomes:
+          'Kael arrives on foot in Chapter 3, having released his horse after the courier confrontation',
+        affectedEntities: {
+          loreEntries: [],
+          characters: ['Kael Ardenvoss'],
+          chapterFlags: ['flag-2'],
+          chapterSummaries: [3],
+        },
+        proposedDiff: {
+          loreEntryUpdates: [],
+          characterUpdates: [],
+          chapterSummaryUpdates: [
+            {
+              chapterNumber: 3,
+              oldSentence:
+                "Kael arrives at Lord Therin Mast's estate in the eastern provinces, exhausted and injured.",
+              newSentence:
+                "Kael arrives on foot at Lord Therin Mast's estate in the eastern provinces, exhausted and injured, having released his horse days earlier to avoid being tracked.",
+            },
+          ],
+          flagsToResolve: ['flag-2'],
+        },
+      },
+      state_updates: [],
+      contradictions: [],
+    }),
+    created_at: new Date('2024-01-15T09:10:10').getTime(),
+    ripple_cards: [],
+  },
+  // ── Correction flow demo — confirmed state ────────────────────────────────
+  {
+    id: 'msg-10',
+    role: 'user',
+    content:
+      "Also — the queen's name should be Isaveth throughout chapter 2, not Seraphel. That was an earlier draft name.",
+    metadata: '{}',
+    created_at: new Date('2024-01-15T09:11:00').getTime(),
+    ripple_cards: [],
+  },
+  {
+    id: 'msg-11',
+    role: 'assistant',
+    content:
+      "You're renaming the queen from Seraphel to Isaveth in Chapter 2 — this will update the chapter summary and her character profile. Shall I apply this change?",
+    metadata: JSON.stringify({
+      input_type: 'correction',
+      is_correction: true,
+      correction_status: 'confirmed',
+      correction_data: {
+        summary: "Queen's name corrected from Seraphel to Isaveth in Chapter 2",
+        whatChanged: 'Queen referred to as Seraphel in Chapter 2',
+        whatItBecomes: 'Queen referred to as Isaveth Vranel in Chapter 2',
+        affectedEntities: {
+          loreEntries: [],
+          characters: ['Queen Isaveth Vranel'],
+          chapterFlags: [],
+          chapterSummaries: [2],
+        },
+        proposedDiff: {
+          loreEntryUpdates: [],
+          characterUpdates: [],
+          chapterSummaryUpdates: [
+            {
+              chapterNumber: 2,
+              oldSentence: 'Queen Seraphel receives word of the courier\'s disappearance',
+              newSentence: 'Queen Isaveth receives word of the courier\'s disappearance',
+            },
+          ],
+          flagsToResolve: [],
+        },
+      },
+      state_updates: [],
+      contradictions: [],
+    }),
+    created_at: new Date('2024-01-15T09:11:20').getTime(),
+    ripple_cards: [],
+  },
 ]
+type CorrectionNote = { id: string; summary: string; appliedAt: string; worldMessageId: string }
+type ChapterFlag = { id: string; severity: 'error' | 'warning'; description: string; resolved: boolean; resolvedBy?: string }
+
 // Mock Chapters
-export const mockChapters = [
+export const mockChapters: Array<{
+  id: string
+  number: number
+  title: string
+  wordCount: number
+  summary: string | null
+  processed: boolean
+  createdAt: Date
+  flags: ChapterFlag[]
+  charactersAppearing: string[]
+  correctionNotes: CorrectionNote[]
+}> = [
   {
     id: "chapter-1",
     number: 1,
@@ -306,11 +419,13 @@ export const mockChapters = [
       {
         id: "flag-1",
         severity: "warning",
+        resolved: false,
         description:
           "Kael is described as carrying his general's insignia in this chapter, but his rank was stripped before the story begins. This may be intentional — a character detail worth clarifying.",
       },
     ],
     charactersAppearing: ["Kael Drovyn", "The Courier"],
+    correctionNotes: [],
   },
   {
     id: "chapter-2",
@@ -318,11 +433,19 @@ export const mockChapters = [
     title: "The Weight of the Throne",
     wordCount: 5103,
     summary:
-      "Queen Seraphel receives word of the courier's disappearance during a formal audience with Guildmaster Renara Voss. She does not react visibly. The chapter intercuts between the public performance of imperial stability and a private meeting afterward where Seraphel issues the order to locate Kael — not through the usual channels, but directly through the Threadweavers. Voss, watching from across the room, notices something is wrong.",
+      "Queen Isaveth receives word of the courier's disappearance during a formal audience with Guildmaster Renara Voss. She does not react visibly. The chapter intercuts between the public performance of imperial stability and a private meeting afterward where Isaveth issues the order to locate Kael — not through the usual channels, but directly through the Threadweavers. Voss, watching from across the room, notices something is wrong.",
     processed: true,
     createdAt: new Date("2024-01-12T10:00:00"),
     flags: [],
-    charactersAppearing: ["Queen Seraphel", "Guildmaster Renara Voss"],
+    charactersAppearing: ["Queen Isaveth Vranel", "Guildmaster Renara Voss"],
+    correctionNotes: [
+      {
+        id: "cn-2",
+        summary: "Queen's name corrected from Seraphel to Isaveth throughout Chapter 2",
+        appliedAt: "2024-01-15T09:11:20",
+        worldMessageId: "msg-11",
+      },
+    ],
   },
   {
     id: "chapter-3",
@@ -330,24 +453,35 @@ export const mockChapters = [
     title: "Eastern Hospitality",
     wordCount: 3967,
     summary:
-      "Kael arrives at Lord Therin Mast's estate in the eastern provinces, exhausted and injured. Therin takes him in without asking questions — which Kael understands is its own kind of question. The chapter is quiet: a meal, a fire, two men who've known each other a long time not saying the important things. By the end Kael has decided he needs to reach Valdris, specifically the Scholar's Quarter. He doesn't tell Therin why.",
+      "Kael arrives on foot at Lord Therin Mast's estate in the eastern provinces, exhausted and injured, having released his horse days earlier to avoid being tracked. Therin takes him in without asking questions — which Kael understands is its own kind of question. The chapter is quiet: a meal, a fire, two men who've known each other a long time not saying the important things. By the end Kael has decided he needs to reach Valdris, specifically the Scholar's Quarter. He doesn't tell Therin why.",
     processed: true,
     createdAt: new Date("2024-01-14T16:00:00"),
     flags: [
       {
         id: "flag-2",
         severity: "error",
+        resolved: true,
+        resolvedBy: "msg-9",
         description:
           "Chapter 3 describes Kael arriving on horseback, but Chapter 1 established he released his horse after the courier confrontation to avoid being tracked. This is a direct continuity error.",
       },
       {
         id: "flag-3",
         severity: "warning",
+        resolved: false,
         description:
           "Therin's estate is described as being in 'the northern reaches of the eastern provinces' — this places it very close to the Ashwall Gate ruins. Worth confirming this is intentional given the Gate's significance.",
       },
     ],
-    charactersAppearing: ["Kael Drovyn", "Lord Therin Mast"],
+    charactersAppearing: ["Kael Ardenvoss", "Lord Therin Mast"],
+    correctionNotes: [
+      {
+        id: "cn-1",
+        summary: "Kael's arrival corrected from horseback to on foot",
+        appliedAt: "2024-01-15T09:10:10",
+        worldMessageId: "msg-9",
+      },
+    ],
   },
   {
     id: "chapter-4",
@@ -359,6 +493,7 @@ export const mockChapters = [
     createdAt: new Date("2024-01-18T09:00:00"),
     flags: [],
     charactersAppearing: [],
+    correctionNotes: [],
   },
 ];
 
@@ -397,6 +532,18 @@ export const mockProcessingSteps = [
 
 // -- Mock Timeline Events ----------
 export const mockTimelineEvents = [
+  {
+    id: "tl-correction-1",
+    title: "Kael's Arrival Corrected: Horseback → On Foot",
+    description:
+      "Corrected: Kael arrives on horseback in Chapter 3 → Kael arrives on foot in Chapter 3, having released his horse after the courier confrontation to avoid being tracked.",
+    source: "world_chat",
+    inStoryDate: null,
+    category: "correction",
+    isCorrection: true,
+    characters: ["Kael Ardenvoss"],
+    createdAt: new Date("2024-01-15T09:10:10"),
+  },
   {
     id: "tl-1",
     title: "The War of 412 — Ashwall Gate Destroyed",

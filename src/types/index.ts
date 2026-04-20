@@ -147,15 +147,43 @@ export interface RippleEffect {
 
 export interface ClaudeBookResponse {
   response: string
-  input_type: 'fact' | 'event' | 'question'
+  input_type: 'fact' | 'event' | 'question' | 'correction'
   state_updates: StateUpdate[]
   ripple_effects: RippleEffect[]
   contradictions: Contradiction[]
   timeline_event?: { title: string; description: string; in_story_date?: string }
+  correction_data?: CorrectionData
 }
+
+export interface CorrectionAffectedEntities {
+  loreEntries: string[]
+  characters: string[]
+  chapterFlags: string[]
+  chapterSummaries: number[]
+}
+
+export interface CorrectionProposedDiff {
+  loreEntryUpdates: Array<{ name: string; field: string; oldValue: string; newValue: string }>
+  characterUpdates: Array<{ name: string; field: string; oldValue: string; newValue: string }>
+  chapterSummaryUpdates: Array<{ chapterNumber: number; oldSentence: string; newSentence: string }>
+  flagsToResolve: string[]
+}
+
+export interface CorrectionData {
+  summary: string
+  whatChanged: string
+  whatItBecomes: string
+  affectedEntities: CorrectionAffectedEntities
+  proposedDiff: CorrectionProposedDiff
+}
+
+export type CorrectionStatus = 'pending_confirmation' | 'confirmed' | 'cancelled'
 
 export interface ChatMetadata {
   input_type?: string
   state_updates?: StateUpdate[]
   contradictions?: Contradiction[]
+  is_correction?: boolean
+  correction_status?: CorrectionStatus
+  correction_data?: CorrectionData
 }
