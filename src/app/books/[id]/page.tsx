@@ -33,6 +33,8 @@ export default function BookPage({ params }: Props) {
   const [tab, setTab] = useState<Tab>('world')
   const [preFillMessage, setPreFillMessage] = useState<string | null>(null)
   const [chaptersKey, setChaptersKey] = useState(0)
+  const [charactersKey, setCharactersKey] = useState(0)
+  const [timelineKey, setTimelineKey] = useState(0)
   const [pendingResolveFlagId, setPendingResolveFlagId] = useState<string | null>(null)
   const { dark, toggle: toggleTheme } = useTheme()
 
@@ -42,9 +44,17 @@ export default function BookPage({ params }: Props) {
     setTab('world')
   }
 
+  function handleCorrectionApplied() {
+    setChaptersKey((k) => k + 1)
+    setCharactersKey((k) => k + 1)
+    setTimelineKey((k) => k + 1)
+  }
+
   function handleTabChange(t: Tab) {
     setTab(t)
     if (t === 'chapters') setChaptersKey((k) => k + 1)
+    if (t === 'characters') setCharactersKey((k) => k + 1)
+    if (t === 'timeline') setTimelineKey((k) => k + 1)
   }
 
   return (
@@ -94,9 +104,10 @@ export default function BookPage({ params }: Props) {
               setPendingResolveFlagId(null)
               setChaptersKey((k) => k + 1)
             }}
+            onCorrectionApplied={handleCorrectionApplied}
           />
         )}
-        {tab === 'characters' && <CharactersTab bookId={params.id} />}
+        {tab === 'characters' && <CharactersTab bookId={params.id} refreshKey={charactersKey} />}
         {tab === 'chapters' && (
           <ChaptersTab
             bookId={params.id}
@@ -104,7 +115,7 @@ export default function BookPage({ params }: Props) {
             onResolveViaChat={handleResolveViaChat}
           />
         )}
-        {tab === 'timeline' && <TimelineTab bookId={params.id} />}
+        {tab === 'timeline' && <TimelineTab bookId={params.id} refreshKey={timelineKey} />}
       </div>
     </div>
   )
@@ -118,12 +129,14 @@ function WorldTab({
   onPreFillConsumed,
   pendingResolveFlagId,
   onFlagResolved,
+  onCorrectionApplied,
 }: {
   bookId: string
   preFillMessage?: string | null
   onPreFillConsumed?: () => void
   pendingResolveFlagId?: string | null
   onFlagResolved?: () => void
+  onCorrectionApplied?: () => void
 }) {
   const isMock = bookId === MOCK_BOOK_ID
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -215,6 +228,7 @@ function WorldTab({
       } catch { /* ok */ }
     }
     toast.success(summary, { duration: 4000 })
+    onCorrectionApplied?.()
   }
 
   async function handleCancelCorrection(messageId: string) {
@@ -384,7 +398,7 @@ function WorldTab({
 
 // ── Characters tab ────────────────────────────────────────────────────────────
 
-function CharactersTab({ bookId }: { bookId: string }) {
+function CharactersTab({ bookId, refreshKey }: { bookId: string; refreshKey?: number }) {
   const isMock = bookId === MOCK_BOOK_ID
   const [characters, setCharacters] = useState<CharacterFull[]>(isMock ? mockCharacters : [])
   const [selected, setSelected] = useState<CharacterFull | null>(null)
@@ -395,7 +409,7 @@ function CharactersTab({ bookId }: { bookId: string }) {
       .then((r) => r.ok ? r.json() : [])
       .then(setCharacters)
       .catch(() => {})
-  }, [bookId, isMock])
+  }, [bookId, isMock, refreshKey])
 
   const ROLE_ORDER: Record<string, number> = {
     protagonist: 0,
@@ -956,6 +970,6 @@ function DropZone() {
   )
 }
 
-function TimelineTab({ bookId }: { bookId: string }) {
-  return <TimelineTabContent bookId={bookId} />
+function TimelineTab({ bookId, refreshKey }: { bookId: string; refreshKey?: number }) {
+  return <TimelineTabContent bookId={bookId} refreshKey={refreshKey} />
 }

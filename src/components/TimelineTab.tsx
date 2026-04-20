@@ -178,9 +178,10 @@ function FilterSelect({
 
 interface Props {
   bookId?: string
+  refreshKey?: number
 }
 
-export function TimelineTab({ bookId }: Props) {
+export function TimelineTab({ bookId, refreshKey }: Props) {
   const isMock = !bookId || bookId === MOCK_BOOK_ID
 
   const [events, setEvents] = useState<TimelineEvent[]>(() =>
@@ -196,7 +197,7 @@ export function TimelineTab({ bookId }: Props) {
       .then((r) => r.ok ? r.json() : [])
       .then((rows: Record<string, unknown>[]) => setEvents(rows.map(normaliseApi)))
       .catch(() => {})
-  }, [bookId, isMock])
+  }, [bookId, isMock, refreshKey])
 
   // Derived filter options
   const allCharacters = useMemo(() => {

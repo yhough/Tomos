@@ -60,19 +60,48 @@ export async function POST(
     }
 
     // ── Character updates ─────────────────────────────────────────────────────
+    console.log('[correction/confirm] characterUpdates:', JSON.stringify(diff.characterUpdates ?? []))
     for (const u of diff.characterUpdates ?? []) {
-      // Try exact name first, then fall back to oldValue (AI sometimes uses the corrected name as the key)
-      const char = (
-        db.prepare('SELECT id, data FROM characters WHERE book_id = ? AND name = ?')
-          .get(params.id, u.name) ??
-        (u.oldValue ? db.prepare('SELECT id, data FROM characters WHERE book_id = ? AND name = ?')
-          .get(params.id, u.oldValue) : undefined)
-      ) as { id: string; data: string } | undefined
+      // Try multiple strategies to find the character
+      const namesToTry = [u.name, u.oldValue].filter(Boolean) as string[]
+      let char: { id: string; data: string } | undefined
+      for (const candidate of namesToTry) {
+        char = db.prepare('SELECT id, data FROM characters WHERE book_id = ? AND LOWER(name) = LOWER(?)')
+          .get(params.id, candidate) as { id: string; data: string } | undefined
+        if (char) break
+      }
+      console.log('[correction/confirm] char lookup for', u.name, '/', u.oldValue, '→', char ? 'found' : 'NOT FOUND')
       if (!char) continue
 
       if (u.field === 'name') {
+        const oldName = u.oldValue ?? u.name
         db.prepare('UPDATE characters SET name = ?, updated_at = ? WHERE id = ?')
           .run(u.newValue, now, char.id)
+        // Update character name in timeline_events.characters JSON arrays
+        const timelineEvents = db
+          .prepare('SELECT id, characters FROM timeline_events WHERE book_id = ?')
+          .all(params.id) as Array<{ id: string; characters: string }>
+        for (const te of timelineEvents) {
+          let names: string[] = []
+          try { names = JSON.parse(te.characters) } catch { continue }
+          if (!names.some((n) => n.toLowerCase() === oldName.toLowerCase())) continue
+          const updated = names.map((n) => n.toLowerCase() === oldName.toLowerCase() ? u.newValue : n)
+          db.prepare('UPDATE timeline_events SET characters = ? WHERE id = ?')
+            .run(JSON.stringify(updated), te.id)
+        }
+
+        // Update character name in chapters.characters_appearing JSON arrays
+        const chapters = db
+          .prepare('SELECT id, characters_appearing FROM chapters WHERE book_id = ?')
+          .all(params.id) as Array<{ id: string; characters_appearing: string }>
+        for (const ch of chapters) {
+          let names: string[] = []
+          try { names = JSON.parse(ch.characters_appearing) } catch { continue }
+          if (!names.some((n) => n.toLowerCase() === oldName.toLowerCase())) continue
+          const updated = names.map((n) => n.toLowerCase() === oldName.toLowerCase() ? u.newValue : n)
+          db.prepare('UPDATE chapters SET characters_appearing = ? WHERE id = ?')
+            .run(JSON.stringify(updated), ch.id)
+        }
       } else if (['description', 'status', 'arc_status'].includes(u.field)) {
         db.prepare(`UPDATE characters SET ${u.field} = ?, updated_at = ? WHERE id = ?`)
           .run(u.newValue, now, char.id)
