@@ -60,7 +60,7 @@ export function WorldMessage({
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-tr-sm bg-amber-50 border border-amber-200/60 text-sm text-foreground leading-relaxed">
+        <div className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-tr-sm bg-amber-50 border border-amber-200/60 text-sm text-amber-950 leading-relaxed">
           {message.content}
         </div>
       </div>
