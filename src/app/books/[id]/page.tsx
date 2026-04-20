@@ -3,7 +3,7 @@
 import { LoreSidebar, type LoreSidebarHandle } from '@/components/LoreSidebar'
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Tab = 'world' | 'characters' | 'chapters' | 'timeline'
 
@@ -64,7 +64,15 @@ export default function BookPage({ params }: Props) {
 
 function WorldTab({ bookId }: { bookId: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [logline, setLogline] = useState<string | null>(null)
   const sidebarRef = useRef<LoreSidebarHandle>(null)
+
+  useEffect(() => {
+    fetch(`/api/books/${bookId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((b) => b && setLogline(b.logline ?? null))
+      .catch(() => {})
+  }, [bookId])
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -77,30 +85,53 @@ function WorldTab({ bookId }: { bookId: string }) {
         <LoreSidebar ref={sidebarRef} bookId={bookId} />
       </aside>
 
-      {/* Chat area */}
+      {/* Chat column — three zones */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {/* Sidebar toggle */}
-        <div className="shrink-0 px-4 py-2 border-b border-border flex items-center">
+
+        {/* Zone 1 — World overview bar (48px) */}
+        <div className="shrink-0 h-12 border-b border-border flex items-center gap-3 px-4">
           <button
             onClick={() => setSidebarOpen((o) => !o)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
           >
-            {sidebarOpen ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
-            {sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
           </button>
+          <p className="text-xs text-muted-foreground truncate">
+            {logline ?? 'No overview yet — start building the world below.'}
+          </p>
         </div>
 
-        {/* Messages — scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Chat interface coming soon.</p>
-        </div>
-
-        {/* Input — pinned to bottom */}
-        <div className="shrink-0 border-t border-border p-4">
-          <div className="rounded-lg border border-input bg-card px-4 py-3 text-sm text-muted-foreground/50">
-            Narrate an event, establish a fact, or ask a question…
+        {/* Zone 2 — Scrollable message feed */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex flex-col gap-6 px-6 py-8">
+            {/* Messages render here — placeholder */}
+            <div className="flex items-center justify-center py-16">
+              <p className="text-sm text-muted-foreground">
+                Narrate an event or ask a question to begin.
+              </p>
+            </div>
           </div>
         </div>
+
+        {/* Zone 3 — Pinned input bar */}
+        <div className="shrink-0 border-t border-border bg-background px-4 py-3">
+          <textarea
+            rows={1}
+            placeholder="Narrate an event, establish a fact, or ask a question…"
+            className="w-full resize-none rounded-lg border border-input bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring leading-relaxed"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                // send handler wired in next step
+              }
+            }}
+          />
+          <p className="text-[10px] text-muted-foreground/40 mt-1.5 pl-1">
+            Enter to send · Shift+Enter for new line
+          </p>
+        </div>
+
       </div>
     </div>
   )
