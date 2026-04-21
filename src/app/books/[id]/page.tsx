@@ -648,25 +648,6 @@ function ChaptersTab({
               {totalWords.toLocaleString('en-US')} words across {processedChapters.length} chapters
             </p>
           </div>
-          <button
-            onClick={scrollToUpload}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: 'hsl(var(--grimm-accent))',
-              color: 'hsl(var(--background))',
-              padding: '8px 18px',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 500,
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <Upload size={14} />
-            Upload chapter
-          </button>
         </div>
 
         {/* ── Stats bar ── */}
