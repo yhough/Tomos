@@ -11,6 +11,35 @@ function getClient(): Anthropic {
   return new Anthropic({ apiKey })
 }
 
+// Attempt to close a truncated JSON string by balancing brackets/braces.
+function balanceJson(s: string): string {
+  const stack: ('{' | '[')[] = []
+  let inString = false
+  let escaped = false
+
+  for (const ch of s) {
+    if (escaped) { escaped = false; continue }
+    if (ch === '\\' && inString) { escaped = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{' || ch === '[') stack.push(ch)
+    else if (ch === '}' || ch === ']') stack.pop()
+  }
+
+  // Close any open string
+  if (inString) s += '"'
+
+  // Remove a trailing incomplete key or comma before closing
+  s = s.replace(/,\s*$/, '').replace(/,\s*([}\]])/, '$1')
+
+  // Close all open structures in reverse order
+  for (let i = stack.length - 1; i >= 0; i--) {
+    s += stack[i] === '{' ? '}' : ']'
+  }
+
+  return s
+}
+
 type DbChapter = {
   id: string
   number: number
@@ -18,6 +47,7 @@ type DbChapter = {
   word_count: number
   summary: string | null
   processing_status: string
+  processing_step: string | null
   correction_notes: string
   characters_appearing: string
   created_at: number
@@ -27,6 +57,7 @@ type DbFlag = {
   id: string
   description: string
   severity: string
+  category: string
   resolved: number
   resolved_by: string | null
 }
@@ -39,10 +70,12 @@ function formatChapter(ch: DbChapter, flags: DbFlag[]) {
     wordCount: ch.word_count,
     summary: ch.summary,
     processed: ch.processing_status === 'done',
+    processingError: ch.processing_status === 'error' ? (ch.processing_step ?? 'Analysis failed') : null,
     createdAt: new Date(ch.created_at),
     flags: flags.map((f) => ({
       id: f.id,
       severity: f.severity as 'error' | 'warning' | 'info',
+      category: (f.category ?? 'continuity') as 'continuity' | 'character' | 'narrative',
       description: f.description,
       resolved: f.resolved === 1,
       resolvedBy: f.resolved_by ?? undefined,
@@ -68,7 +101,7 @@ export async function GET(
 ) {
   const chapters = db
     .prepare(
-      `SELECT id, number, title, word_count, summary, processing_status,
+      `SELECT id, number, title, word_count, summary, processing_status, processing_step,
               correction_notes, characters_appearing, created_at
        FROM chapters WHERE book_id = ? ORDER BY number ASC`
     )
@@ -77,7 +110,7 @@ export async function GET(
   const result = chapters.map((ch) => {
     const flags = db
       .prepare(
-        `SELECT id, description, severity, resolved, resolved_by
+        `SELECT id, description, severity, category, resolved, resolved_by
          FROM continuity_flags WHERE chapter_id = ? ORDER BY created_at ASC`
       )
       .all(ch.id) as DbFlag[]
@@ -172,7 +205,7 @@ export async function POST(
     const client = getClient()
     const aiResponse = await client.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 3000,
+      max_tokens: 8000,
       system: systemPrompt,
       messages: [
         {
@@ -182,13 +215,46 @@ export async function POST(
       ],
     })
 
-    const rawText = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : '{}'
+    const wasTruncated = aiResponse.stop_reason === 'max_tokens'
+    const rawText = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : ''
+
+    // Strip markdown fences in case Claude added them despite instructions
+    const cleaned = rawText
+      .replace(/^```(?:json)?\s*/m, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim()
 
     let parsed: ChapterAnalysis
+    let parseOk = false
+
+    // 1. Try normal parse
     try {
-      parsed = JSON.parse(rawText.match(/\{[\s\S]*\}/)?.[0] ?? '{}') as ChapterAnalysis
+      const jsonStr = cleaned.match(/\{[\s\S]*\}/)?.[0] ?? ''
+      if (!jsonStr) throw new Error('no JSON block found')
+      parsed = JSON.parse(jsonStr) as ChapterAnalysis
+      parseOk = !!parsed.summary?.trim()
     } catch {
-      parsed = { summary: '', state_updates: [], characters: [], continuity_flags: [], timeline_events: [] }
+      // 2. If truncated, try to balance open brackets and parse again
+      if (wasTruncated) {
+        try {
+          const partial = cleaned.match(/\{[\s\S]*/)?.[0] ?? ''
+          parsed = JSON.parse(balanceJson(partial)) as ChapterAnalysis
+          parseOk = !!parsed.summary?.trim()
+        } catch { /* repair also failed */ }
+      }
+      if (!parseOk) {
+        parsed = { summary: '', state_updates: [], characters: [], continuity_flags: [], timeline_events: [] }
+      }
+    }
+
+    if (!parseOk) {
+      const reason = wasTruncated
+        ? 'Chapter too long to analyze in one pass — try splitting it into smaller sections'
+        : 'AI response could not be parsed — please try again'
+      db.prepare(
+        `UPDATE chapters SET processing_status = 'error', processing_step = ?, updated_at = ? WHERE id = ?`
+      ).run(reason, Date.now(), finalChapterId)
+      return NextResponse.json({ error: reason }, { status: 422 })
     }
 
     // ── Save results ──────────────────────────────────────────────────────────
@@ -281,12 +347,13 @@ export async function POST(
     for (const flag of parsed.continuity_flags ?? []) {
       if (!flag.description?.trim()) continue
       db.prepare(
-        `INSERT INTO continuity_flags (id, chapter_id, book_id, description, severity, resolved, created_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?)`
+        `INSERT INTO continuity_flags (id, chapter_id, book_id, description, severity, category, resolved, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
       ).run(
         generateId(), finalChapterId, params.id,
         flag.description,
         flag.severity ?? 'warning',
+        flag.category ?? 'continuity',
         Date.now()
       )
     }
@@ -319,14 +386,14 @@ export async function POST(
 
     // Return the formatted chapter
     const updatedChapter = db.prepare(
-      `SELECT id, number, title, word_count, summary, processing_status,
+      `SELECT id, number, title, word_count, summary, processing_status, processing_step,
               correction_notes, characters_appearing, created_at
        FROM chapters WHERE id = ?`
     ).get(finalChapterId) as DbChapter
 
     const flags = db
       .prepare(
-        `SELECT id, description, severity, resolved, resolved_by
+        `SELECT id, description, severity, category, resolved, resolved_by
          FROM continuity_flags WHERE chapter_id = ? ORDER BY created_at ASC`
       )
       .all(finalChapterId) as DbFlag[]
@@ -366,6 +433,7 @@ interface ChapterAnalysis {
   continuity_flags: Array<{
     description: string
     severity: 'error' | 'warning' | 'info'
+    category: 'continuity' | 'character' | 'narrative'
   }>
   timeline_events: Array<{
     title: string
@@ -437,8 +505,9 @@ Respond ONLY with valid JSON — no markdown fences, no commentary:
   ],
   "continuity_flags": [
     {
-      "description": "clear description of the continuity issue",
-      "severity": "error" | "warning" | "info"
+      "description": "clear description of the issue",
+      "severity": "error" | "warning" | "info",
+      "category": "continuity" | "character" | "narrative"
     }
   ],
   "timeline_events": [
@@ -452,7 +521,8 @@ Respond ONLY with valid JSON — no markdown fences, no commentary:
 }
 
 Rules:
-- continuity_flags severity: "error" = direct contradiction with established lore; "warning" = possible inconsistency worth flagging; "info" = interesting note
+- continuity_flags severity: "error" = direct contradiction with established facts; "warning" = possible inconsistency or notable concern; "info" = minor observation
+- continuity_flags category: "continuity" = factual contradiction (wrong location, impossible timeline, dead character reappears, etc.); "character" = character acts against their established personality, motivation, or arc; "narrative" = unexplained gap in logic, missing cause-and-effect, pacing issue, or plot hole
 - Only flag real issues — don't invent problems
 - Only include characters who actually appear in this chapter
 - Only include state_updates for newly established facts or significant updates

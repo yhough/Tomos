@@ -507,6 +507,7 @@ function chaptersFromApi(raw: unknown[]): RealChapter[] {
       wordCount: ch.wordCount as number,
       summary: (ch.summary as string | null) ?? null,
       processed: ch.processed as boolean,
+      processingError: (ch.processingError as string | null) ?? null,
       createdAt: new Date(ch.createdAt as string | number),
       flags: (ch.flags as RealChapter['flags']) ?? [],
       charactersAppearing: (ch.charactersAppearing as string[]) ?? [],

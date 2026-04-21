@@ -156,6 +156,7 @@ function createDb(): Database.Database {
           book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
           description TEXT NOT NULL,
           severity TEXT NOT NULL DEFAULT 'warning',
+          category TEXT NOT NULL DEFAULT 'continuity',
           resolved INTEGER NOT NULL DEFAULT 0,
           resolved_by TEXT,
           created_at INTEGER NOT NULL
@@ -163,6 +164,7 @@ function createDb(): Database.Database {
         INSERT INTO continuity_flags_v2
           SELECT id, chapter_id, book_id, description,
             CASE severity WHEN 'hard' THEN 'error' WHEN 'soft' THEN 'warning' ELSE severity END,
+            'continuity',
             resolved, resolved_by, created_at
           FROM continuity_flags;
         DROP TABLE continuity_flags;
@@ -171,6 +173,9 @@ function createDb(): Database.Database {
       `)
     }
   } catch { /* already migrated */ }
+
+  // Add category to any existing continuity_flags table that predates the v2 recreation
+  try { sqlite.exec(`ALTER TABLE continuity_flags ADD COLUMN category TEXT NOT NULL DEFAULT 'continuity'`) } catch { /* already exists */ }
 
   return sqlite
 }

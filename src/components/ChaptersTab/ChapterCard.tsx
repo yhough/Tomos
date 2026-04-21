@@ -54,6 +54,14 @@ const btn: React.CSSProperties = {
 }
 
 function StatusBadge({ chapter }: { chapter: Chapter }) {
+  const ch = chapter as Chapter & { processingError?: string | null }
+  if (ch.processingError) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'hsl(var(--grimm-danger) / 0.12)', color: 'hsl(var(--grimm-danger))', fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 500 }}>
+        <AlertTriangle size={12} /> Analysis failed
+      </span>
+    )
+  }
   if (!chapter.processed) {
     return (
       <span style={{ backgroundColor: 'hsl(var(--grimm-surface-raised))', color: 'hsl(var(--grimm-muted))', fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 500 }}>
@@ -65,9 +73,10 @@ function StatusBadge({ chapter }: { chapter: Chapter }) {
   const errors = unresolvedFlags.filter((f) => f.severity === 'error')
   const warnings = unresolvedFlags.filter((f) => f.severity === 'warning')
   if (errors.length > 0) {
+    const total = errors.length + warnings.length
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'hsl(var(--grimm-danger) / 0.12)', color: 'hsl(var(--grimm-danger))', fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 500 }}>
-        <AlertTriangle size={12} />{errors.length} {errors.length === 1 ? 'issue' : 'issues'}
+        <AlertTriangle size={12} />{total} {total === 1 ? 'issue' : 'issues'}
       </span>
     )
   }
@@ -355,23 +364,54 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
                 </div>
               )}
 
-              {/* Continuity flags — unresolved only */}
+              {/* Flags — unresolved only */}
               {unresolvedFlags.length > 0 && (
                 <div style={{ padding: '0 20px 20px' }}>
                   <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                    Continuity flags
+                    Flags
                   </p>
                   {unresolvedFlags.map((flag) => {
+                    const cat = (flag as { category?: string }).category ?? 'continuity'
                     const isError = flag.severity === 'error'
+
+                    const flagStyle = (() => {
+                      if (cat === 'character') return {
+                        bg: 'hsl(var(--grimm-warn-char) / 0.12)',
+                        border: 'hsl(var(--grimm-warn-char))',
+                        color: 'hsl(var(--grimm-warn-char))',
+                        label: 'Character inconsistency',
+                        icon: <AlertTriangle size={12} style={{ color: 'hsl(var(--grimm-warn-char))', flexShrink: 0 }} />,
+                      }
+                      if (cat === 'narrative') return {
+                        bg: 'hsl(var(--grimm-warn-narrative) / 0.12)',
+                        border: 'hsl(var(--grimm-warn-narrative))',
+                        color: 'hsl(var(--grimm-warn-narrative))',
+                        label: 'Narrative gap',
+                        icon: <Info size={12} style={{ color: 'hsl(var(--grimm-warn-narrative))', flexShrink: 0 }} />,
+                      }
+                      // continuity (default)
+                      if (isError) return {
+                        bg: 'hsl(var(--grimm-danger) / 0.1)',
+                        border: 'hsl(var(--grimm-danger))',
+                        color: 'hsl(var(--grimm-danger))',
+                        label: 'Continuity error',
+                        icon: <AlertTriangle size={12} style={{ color: 'hsl(var(--grimm-danger))', flexShrink: 0 }} />,
+                      }
+                      return {
+                        bg: 'hsl(var(--grimm-accent) / 0.1)',
+                        border: 'hsl(var(--grimm-accent))',
+                        color: 'hsl(var(--grimm-accent))',
+                        label: 'Worth checking',
+                        icon: <Info size={12} style={{ color: 'hsl(var(--grimm-accent))', flexShrink: 0 }} />,
+                      }
+                    })()
+
                     return (
-                      <div key={flag.id} style={{ backgroundColor: isError ? 'hsl(var(--grimm-danger) / 0.1)' : 'hsl(var(--grimm-accent) / 0.1)', borderLeft: `3px solid hsl(var(--grimm-${isError ? 'danger' : 'accent'}))`, borderRadius: '0 6px 6px 0', padding: '10px 14px', marginBottom: 8 }}>
+                      <div key={flag.id} style={{ backgroundColor: flagStyle.bg, borderLeft: `3px solid ${flagStyle.border}`, borderRadius: '0 6px 6px 0', padding: '10px 14px', marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {isError
-                            ? <AlertTriangle size={12} style={{ color: 'hsl(var(--grimm-danger))', flexShrink: 0 }} />
-                            : <Info size={12} style={{ color: 'hsl(var(--grimm-accent))', flexShrink: 0 }} />
-                          }
-                          <span style={{ color: isError ? 'hsl(var(--grimm-danger))' : 'hsl(var(--grimm-accent))', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
-                            {isError ? 'Continuity error' : 'Worth checking'}
+                          {flagStyle.icon}
+                          <span style={{ color: flagStyle.color, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
+                            {flagStyle.label}
                           </span>
                         </div>
                         <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>
@@ -381,12 +421,11 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              const severityLabel = flag.severity === 'error' ? 'continuity error' : 'continuity warning'
                               const summaryLine = chapter.summary
                                 ? `\n\nThe chapter summary reads: "${chapter.summary}"`
                                 : ''
                               const message =
-                                `In Chapter ${chapter.number} — "${chapter.title}" — there is a ${severityLabel}:\n\n"${flag.description}"${summaryLine}\n\nHow should I correct this?`
+                                `In Chapter ${chapter.number} — "${chapter.title}" — there is a ${flagStyle.label.toLowerCase()}:\n\n"${flag.description}"${summaryLine}\n\nHow should I correct this?`
                               onResolveViaChat(message, flag.id)
                             }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'hsl(var(--grimm-accent))', fontSize: 12, padding: '4px 0 0', display: 'inline-flex', alignItems: 'center', gap: 3 }}
@@ -400,24 +439,47 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
                 </div>
               )}
             </>
-          ) : (
-            /* Unprocessed */
-            <div style={{ padding: '24px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Upload size={32} style={{ color: 'hsl(var(--grimm-muted))' }} />
-              <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 14, marginTop: 12 }}>
-                This chapter hasn&apos;t been analyzed yet
-              </p>
-              <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 13, marginTop: 6, maxWidth: 360, lineHeight: 1.5 }}>
-                Upload the text to extract characters, check continuity, and update your world.
-              </p>
-              <button
-                onClick={() => onRequestUpload?.(chapter.number, chapter.title)}
-                style={{ backgroundColor: 'hsl(var(--grimm-accent))', color: 'hsl(var(--background))', padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, marginTop: 16, border: 'none', cursor: 'pointer' }}
-              >
-                Analyze now
-              </button>
-            </div>
-          )}
+          ) : (() => {
+            const processingError = (chapter as Chapter & { processingError?: string | null }).processingError
+            if (processingError) {
+              return (
+                /* Analysis failed */
+                <div style={{ padding: '24px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <AlertTriangle size={32} style={{ color: 'hsl(var(--grimm-danger))' }} />
+                  <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 14, marginTop: 12, fontWeight: 500 }}>
+                    Analysis failed
+                  </p>
+                  <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 13, marginTop: 6, maxWidth: 400, lineHeight: 1.5 }}>
+                    {processingError}
+                  </p>
+                  <button
+                    onClick={() => onRequestUpload?.(chapter.number, chapter.title)}
+                    style={{ backgroundColor: 'hsl(var(--grimm-accent))', color: 'hsl(var(--background))', padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, marginTop: 16, border: 'none', cursor: 'pointer' }}
+                  >
+                    Try again
+                  </button>
+                </div>
+              )
+            }
+            return (
+              /* Unprocessed */
+              <div style={{ padding: '24px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Upload size={32} style={{ color: 'hsl(var(--grimm-muted))' }} />
+                <p style={{ color: 'hsl(var(--grimm-text))', fontSize: 14, marginTop: 12 }}>
+                  This chapter hasn&apos;t been analyzed yet
+                </p>
+                <p style={{ color: 'hsl(var(--grimm-muted))', fontSize: 13, marginTop: 6, maxWidth: 360, lineHeight: 1.5 }}>
+                  Upload the text to extract characters, check continuity, and update your world.
+                </p>
+                <button
+                  onClick={() => onRequestUpload?.(chapter.number, chapter.title)}
+                  style={{ backgroundColor: 'hsl(var(--grimm-accent))', color: 'hsl(var(--background))', padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, marginTop: 16, border: 'none', cursor: 'pointer' }}
+                >
+                  Analyze now
+                </button>
+              </div>
+            )
+          })()}
 
           {/* ── Notes section ── */}
           {showNotesSection && (
