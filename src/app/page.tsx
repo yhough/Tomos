@@ -4,11 +4,11 @@ import { BookCard } from '@/components/BookCard'
 import { useTheme } from '@/hooks/useTheme'
 import { mockBook, MOCK_BOOK_ID } from '@/lib/mock-data'
 import type { Book } from '@/types'
-import { BookOpen, Clock, Home, Library, LogOut, Moon, Plus, Search, Sparkles, Sun, X } from 'lucide-react'
+import { BookOpen, Clock, CreditCard, Home, Library, LogOut, Moon, Plus, Search, Settings, Sparkles, Sun, X } from 'lucide-react'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const MOCK_BOOK_CARD: Book = {
   id: MOCK_BOOK_ID,
@@ -34,7 +34,19 @@ export default function HomePage() {
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
   const { dark, toggle: toggleTheme } = useTheme()
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false)
+      }
+    }
+    if (settingsOpen) document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [settingsOpen])
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -130,13 +142,34 @@ export default function HomePage() {
             >
               {dark ? <Sun size={13} /> : <Moon size={13} />}
             </button>
-            <button
-              onClick={handleLogout}
-              title="Sign out"
-              className="shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground/50 hover:text-muted-foreground"
-            >
-              <LogOut size={13} />
-            </button>
+            <div className="relative shrink-0" ref={settingsRef}>
+              <button
+                onClick={() => setSettingsOpen((o) => !o)}
+                title="Settings"
+                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground/50 hover:text-muted-foreground"
+              >
+                <Settings size={13} />
+              </button>
+              {settingsOpen && (
+                <div className="absolute bottom-full right-0 mb-1.5 w-40 rounded-md border border-border bg-card shadow-md py-1 z-50">
+                  <button
+                    onClick={() => setSettingsOpen(false)}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                  >
+                    <CreditCard size={13} className="text-muted-foreground" />
+                    Billing
+                  </button>
+                  <div className="h-px bg-border mx-2 my-1" />
+                  <button
+                    onClick={() => { setSettingsOpen(false); handleLogout() }}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                  >
+                    <LogOut size={13} className="text-muted-foreground" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </aside>

@@ -60,10 +60,10 @@ export default function LoginPage() {
             className="text-[22px] leading-snug text-foreground"
             style={{ fontFamily: 'var(--font-playfair)', fontStyle: 'italic' }}
           >
-            "Every story is a world that needs to be kept consistent."
+            "Let the world burn through you. Throw the prism light, white hot, on paper."
           </p>
-          <p className="text-sm text-muted-foreground mt-5 leading-relaxed">
-            Fief is your AI writing companion — tracking lore, flagging continuity errors, and building your world alongside you.
+          <p className="text-sm text-muted-foreground mt-4">
+            —Ray Bradbury, <span style={{ fontStyle: 'italic' }}>WD</span>
           </p>
         </div>
 
