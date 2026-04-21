@@ -145,6 +145,11 @@ function createDb(): Database.Database {
     );
   `)
 
+  // Billing columns on users
+  try { sqlite.exec(`ALTER TABLE users ADD COLUMN stripe_customer_id TEXT`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'`) } catch { /* already exists */ }
+  try { sqlite.exec(`ALTER TABLE users ADD COLUMN plan_expires_at INTEGER`) } catch { /* already exists */ }
+
   // Non-destructive migrations
   try { sqlite.exec(`ALTER TABLE books ADD COLUMN cover_image TEXT`) } catch { /* already exists */ }
   try { sqlite.exec(`ALTER TABLE timeline_events ADD COLUMN category TEXT NOT NULL DEFAULT 'history'`) } catch { /* already exists */ }

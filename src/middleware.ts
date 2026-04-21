@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 
 const COOKIE_NAME = 'auth_session'
 const PUBLIC_PATHS = ['/login', '/signup']
-const PUBLIC_API_PREFIXES = ['/api/auth/']
+const PUBLIC_API_PREFIXES = ['/api/auth/', '/api/webhooks/']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

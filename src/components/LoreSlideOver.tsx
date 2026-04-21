@@ -1,6 +1,6 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { MessageSquare, Pencil, X } from 'lucide-react'
 import { useEffect } from 'react'
 
 export type LoreCategory = 'character' | 'faction' | 'location' | 'magic' | 'misc'
@@ -16,27 +16,27 @@ export interface LoreEntry {
 
 const CATEGORY_LABELS: Record<LoreCategory, string> = {
   character: 'Character',
-  faction: 'Faction',
-  location: 'Location',
-  magic: 'Magic & Systems',
-  misc: 'Lore & Misc',
+  faction:   'Faction',
+  location:  'Location',
+  magic:     'Magic & Systems',
+  misc:      'Lore & Misc',
 }
 
 const CATEGORY_COLORS: Record<LoreCategory, string> = {
   character: 'text-blue-500 bg-blue-500/10',
-  faction: 'text-amber-500 bg-amber-500/10',
-  location: 'text-green-500 bg-green-500/10',
-  magic: 'text-violet-500 bg-violet-500/10',
-  misc: 'text-zinc-500 bg-zinc-500/10',
+  faction:   'text-amber-500 bg-amber-500/10',
+  location:  'text-green-500 bg-green-500/10',
+  magic:     'text-violet-500 bg-violet-500/10',
+  misc:      'text-zinc-500 bg-zinc-500/10',
 }
 
 interface Props {
   entry: LoreEntry | null
   onClose: () => void
+  onEditInChat: (message: string) => void
 }
 
-export function LoreSlideOver({ entry, onClose }: Props) {
-  // Close on Escape
+export function LoreSlideOver({ entry, onClose, onEditInChat }: Props) {
   useEffect(() => {
     if (!entry) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -51,15 +51,15 @@ export function LoreSlideOver({ entry, onClose }: Props) {
 
   const labelColor = CATEGORY_COLORS[entry.category]
 
+  function handleEditInChat() {
+    onEditInChat(`I'd like to update "${entry!.name}": `)
+    onClose()
+  }
+
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={onClose} />
 
-      {/* Panel */}
       <div className="fixed right-0 top-0 h-full w-[380px] z-50 flex flex-col bg-background border-l border-border shadow-xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
@@ -89,6 +89,7 @@ export function LoreSlideOver({ entry, onClose }: Props) {
           )}
 
           {Object.entries(parsedData).map(([key, value]) => {
+            if (key === 'category') return null
             if (!value || (Array.isArray(value) && value.length === 0)) return null
             return (
               <section key={key}>
@@ -110,6 +111,18 @@ export function LoreSlideOver({ entry, onClose }: Props) {
               </section>
             )
           })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-border shrink-0">
+          <button
+            onClick={handleEditInChat}
+            className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-md border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <MessageSquare size={13} />
+            <Pencil size={11} className="opacity-50" />
+            Edit in chat
+          </button>
         </div>
       </div>
     </>

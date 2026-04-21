@@ -1,17 +1,17 @@
 'use client'
 
 import { LoreSlideOver, type LoreCategory, type LoreEntry } from '@/components/LoreSlideOver'
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 
 type SectionKey = keyof LoreSections
 
 const SECTIONS: { key: SectionKey; label: string; dot: string; optional: boolean }[] = [
-  { key: 'characters', label: 'Characters',     dot: 'bg-blue-400',   optional: false },
-  { key: 'locations',  label: 'Locations',      dot: 'bg-green-400',  optional: false },
-  { key: 'factions',   label: 'Factions',       dot: 'bg-amber-400',  optional: true  },
-  { key: 'magic',      label: 'Magic & Systems',dot: 'bg-violet-400', optional: true  },
-  { key: 'misc',       label: 'Lore & Misc',    dot: 'bg-zinc-400',   optional: true  },
+  { key: 'characters', label: 'Characters',      dot: 'bg-blue-400',   optional: false },
+  { key: 'locations',  label: 'Locations',       dot: 'bg-green-400',  optional: false },
+  { key: 'factions',   label: 'Factions',        dot: 'bg-amber-400',  optional: true  },
+  { key: 'magic',      label: 'Magic & Systems', dot: 'bg-violet-400', optional: true  },
+  { key: 'misc',       label: 'Lore & Misc',     dot: 'bg-zinc-400',   optional: true  },
 ]
 
 interface LoreSections {
@@ -34,14 +34,14 @@ export interface LoreSidebarHandle {
 interface Props {
   bookId: string
   mockData?: LoreData
+  onEditInChat?: (message: string) => void
 }
 
-export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSidebar({ bookId, mockData }, ref) {
+export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSidebar({ bookId, mockData, onEditInChat }, ref) {
   const [data, setData] = useState<LoreData | null>(mockData ?? null)
   const [open, setOpen] = useState<Record<string, boolean>>({
     characters: true, locations: true, factions: true, magic: true, misc: true,
   })
-  // Optional sections the user has explicitly unlocked (even if still empty)
   const [unlocked, setUnlocked] = useState<Set<SectionKey>>(new Set())
   const [selected, setSelected] = useState<LoreEntry | null>(null)
 
@@ -54,19 +54,16 @@ export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSid
   }
 
   useEffect(() => { fetchLore() }, [bookId])
-
   useImperativeHandle(ref, () => ({ refetch: fetchLore }))
 
   const activeSections = SECTIONS.filter(({ key, optional }) => {
     if (!optional) return true
-    const hasEntries = (data?.sections[key]?.length ?? 0) > 0
-    return hasEntries || unlocked.has(key)
+    return (data?.sections[key]?.length ?? 0) > 0 || unlocked.has(key)
   })
 
   const hiddenOptional = SECTIONS.filter(({ key, optional }) => {
     if (!optional) return false
-    const hasEntries = (data?.sections[key]?.length ?? 0) > 0
-    return !hasEntries && !unlocked.has(key)
+    return (data?.sections[key]?.length ?? 0) === 0 && !unlocked.has(key)
   })
 
   return (
@@ -125,9 +122,7 @@ export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSid
                 )}
 
                 {isOpen && entries.length === 0 && (
-                  <p className="px-5 pb-2 text-[11px] text-muted-foreground/50 italic">
-                    None yet
-                  </p>
+                  <p className="px-5 pb-2 text-[11px] text-muted-foreground/50 italic">None yet</p>
                 )}
 
                 <div className="mx-4 border-t border-border/50" />
@@ -147,7 +142,6 @@ export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSid
                   onClick={() => setUnlocked((u) => { const n = new Set(u); n.add(key); return n })}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md text-left w-full hover:bg-muted/50 transition-colors group"
                 >
-                  <Plus size={10} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot} opacity-40 group-hover:opacity-70 transition-opacity`} />
                   <span className="text-[11px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
                     {label}
@@ -159,7 +153,14 @@ export const LoreSidebar = forwardRef<LoreSidebarHandle, Props>(function LoreSid
         </div>
       </div>
 
-      <LoreSlideOver entry={selected} onClose={() => setSelected(null)} />
+      <LoreSlideOver
+        entry={selected}
+        onClose={() => setSelected(null)}
+        onEditInChat={(msg) => {
+          setSelected(null)
+          onEditInChat?.(msg)
+        }}
+      />
     </>
   )
 })

@@ -322,6 +322,10 @@ function WorldTab({
           ref={sidebarRef}
           bookId={bookId}
           mockData={isMock ? { logline: mockBook.logline, sections: mockLoreSections } : undefined}
+          onEditInChat={(msg) => {
+            setInput(msg)
+            setTimeout(() => inputRef.current?.focus(), 80)
+          }}
         />
       </aside>
 

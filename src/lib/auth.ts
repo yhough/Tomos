@@ -9,6 +9,7 @@ export type SessionUser = {
   id: string
   name: string
   email: string
+  plan: string
 }
 
 export function createSession(userId: string): string {
@@ -27,7 +28,7 @@ export function deleteSession(token: string) {
 
 export function getSessionUser(token: string): SessionUser | null {
   const row = db.prepare(`
-    SELECT u.id, u.name, u.email
+    SELECT u.id, u.name, u.email, COALESCE(u.plan, 'free') as plan
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token = ? AND s.expires_at > ?
@@ -39,6 +40,13 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = cookies().get(COOKIE_NAME)?.value
   if (!token) return null
   return getSessionUser(token)
+}
+
+export async function requirePro(): Promise<SessionUser> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Unauthorized')
+  if (user.plan !== 'pro') throw new Error('Pro plan required')
+  return user
 }
 
 export function setSessionCookie(token: string): string {

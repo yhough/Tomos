@@ -26,7 +26,7 @@ const MOCK_BOOK_CARD: Book = {
 
 type Tab = 'home' | 'library'
 
-type User = { id: string; name: string; email: string }
+type User = { id: string; name: string; email: string; plan?: string }
 
 export default function HomePage() {
   const router = useRouter()
@@ -133,7 +133,9 @@ export default function HomePage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground leading-tight truncate">{user?.name ?? '—'}</p>
-              <p className="text-xs text-muted-foreground leading-tight truncate">Free plan</p>
+              <p className="text-xs text-muted-foreground leading-tight truncate">
+                {user?.plan === 'pro' ? 'Pro' : 'Free plan'}
+              </p>
             </div>
             <button
               onClick={toggleTheme}
@@ -153,7 +155,12 @@ export default function HomePage() {
               {settingsOpen && (
                 <div className="absolute bottom-full right-0 mb-1.5 w-40 rounded-md border border-border bg-card shadow-md py-1 z-50">
                   <button
-                    onClick={() => setSettingsOpen(false)}
+                    onClick={async () => {
+                      setSettingsOpen(false)
+                      const res = await fetch('/api/billing/portal', { method: 'POST' })
+                      const { url } = await res.json()
+                      if (url) window.location.href = url
+                    }}
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                   >
                     <CreditCard size={13} className="text-muted-foreground" />
