@@ -11,6 +11,16 @@ interface CharData {
   notable_moments?: string[]
 }
 
+export interface TimelineEvent {
+  title: string
+  description: string | null
+  category: string | null
+  characters: string[]
+  in_story_date: string | null
+  source: string
+  source_id: string | null
+}
+
 export interface ExportData {
   book: {
     title: string
@@ -42,19 +52,14 @@ export interface ExportData {
     worldLore: Array<{ name: string; summary: string | null }>
   }
   chapters: Array<{
+    id: string
     number: number
     title: string
     summary: string | null
     word_count: number
     characters_appearing: string[]
   }>
-  timeline: Array<{
-    title: string
-    description: string | null
-    category: string | null
-    characters: string[]
-    in_story_date: string | null
-  }>
+  timeline: TimelineEvent[]
 }
 
 // ── Markdown generator ────────────────────────────────────────────────────────
@@ -121,7 +126,17 @@ function generateMarkdown(data: ExportData): string {
   loreSections(data.lore.worldLore, 'World Lore')
 
   if (data.chapters.length > 0) {
-    lines.push('---', '', '## Chapters', '')
+    // Build a map of chapter-sourced events keyed by chapter id
+    const eventsByChapter = new Map<string, TimelineEvent[]>()
+    for (const e of data.timeline) {
+      if (e.source === 'chapter' && e.source_id) {
+        const list = eventsByChapter.get(e.source_id) ?? []
+        list.push(e)
+        eventsByChapter.set(e.source_id, list)
+      }
+    }
+
+    lines.push('---', '', '## Story', '')
     for (const ch of data.chapters) {
       lines.push(`### Chapter ${ch.number}: ${ch.title}`)
       lines.push(`*${ch.word_count.toLocaleString('en-US')} words*`, '')
@@ -129,15 +144,25 @@ function generateMarkdown(data: ExportData): string {
       if (ch.characters_appearing.length > 0) {
         lines.push(`**Characters:** ${ch.characters_appearing.join(', ')}`, '')
       }
+      const events = eventsByChapter.get(ch.id) ?? []
+      if (events.length > 0) {
+        lines.push('**Key Events:**')
+        for (const e of events) {
+          const datePart = e.in_story_date ? ` *(${e.in_story_date})*` : ''
+          lines.push(`- **${e.title}**${datePart}${e.description ? ' — ' + e.description : ''}`)
+        }
+        lines.push('')
+      }
     }
   }
 
-  if (data.timeline.length > 0) {
-    lines.push('---', '', '## Timeline', '')
-    for (const e of data.timeline) {
+  // World-history events not tied to a chapter
+  const worldEvents = data.timeline.filter((e) => e.source !== 'chapter')
+  if (worldEvents.length > 0) {
+    lines.push('---', '', '## World History', '')
+    for (const e of worldEvents) {
       const datePart = e.in_story_date ? ` *(${e.in_story_date})*` : ''
-      const catPart = e.category ? ` [${e.category}]` : ''
-      lines.push(`**${e.title}**${datePart}${catPart}`)
+      lines.push(`**${e.title}**${datePart}`)
       if (e.description) lines.push(e.description)
       if (e.characters.length > 0) lines.push(`*Characters: ${e.characters.join(', ')}*`)
       lines.push('')
@@ -215,23 +240,50 @@ function generatePrintHtml(data: ExportData): string {
     })
     .join('')
 
-  const chaptersHtml = data.chapters
-    .map(
-      (ch) => `<div class="chapter-block">
-        <h3>Chapter ${ch.number}: ${esc(ch.title)}</h3>
-        <div class="chapter-meta">${ch.word_count.toLocaleString('en-US')} words</div>
-        ${ch.summary ? `<p>${esc(ch.summary)}</p>` : ''}
+  // Group chapter-sourced events by their chapter id
+  const eventsByChapter = new Map<string, TimelineEvent[]>()
+  for (const e of data.timeline) {
+    if (e.source === 'chapter' && e.source_id) {
+      const list = eventsByChapter.get(e.source_id) ?? []
+      list.push(e)
+      eventsByChapter.set(e.source_id, list)
+    }
+  }
+
+  const storyHtml = data.chapters
+    .map((ch) => {
+      const events = eventsByChapter.get(ch.id) ?? []
+      const eventsHtml = events.length
+        ? `<ul class="event-list">${events
+            .map((e) => {
+              const datePart = e.in_story_date
+                ? `<span class="tl-date">${esc(e.in_story_date)}</span>`
+                : ''
+              return `<li><strong>${esc(e.title)}</strong>${datePart}${
+                e.description ? ` — ${esc(e.description)}` : ''
+              }</li>`
+            })
+            .join('')}</ul>`
+        : ''
+      return `<div class="chapter-block">
+        <div class="chapter-header">
+          <h3>Ch. ${ch.number} — ${esc(ch.title)}</h3>
+          <span class="chapter-meta">${ch.word_count.toLocaleString('en-US')} words</span>
+        </div>
         ${ch.characters_appearing.length ? `<div class="meta">Characters: ${ch.characters_appearing.map(esc).join(', ')}</div>` : ''}
+        ${ch.summary ? `<p>${esc(ch.summary)}</p>` : ''}
+        ${eventsHtml}
       </div>`
-    )
+    })
     .join('')
 
-  const timelineHtml = data.timeline
+  // World-history events not tied to a specific chapter
+  const worldEvents = data.timeline.filter((e) => e.source !== 'chapter')
+  const worldHistoryHtml = worldEvents
     .map((e) => {
       const datePart = e.in_story_date ? `<span class="tl-date">${esc(e.in_story_date)}</span>` : ''
-      const catPart = e.category ? `<span class="tl-cat">${esc(e.category)}</span>` : ''
       return `<div class="tl-item">
-        <div class="tl-header"><strong>${esc(e.title)}</strong>${datePart}${catPart}</div>
+        <div class="tl-header"><strong>${esc(e.title)}</strong>${datePart}</div>
         ${e.description ? `<p>${esc(e.description)}</p>` : ''}
         ${e.characters.length ? `<div class="meta">Characters: ${e.characters.map(esc).join(', ')}</div>` : ''}
       </div>`
@@ -257,17 +309,21 @@ h3{font-size:16px;font-weight:700;margin-bottom:6px}
 p{margin-bottom:10px;color:#333}
 .meta{font-size:12px;color:#888;margin-bottom:10px}
 .meta em{color:#555;font-style:normal}
-.char-block,.rel-block,.lore-item,.chapter-block{margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #eee}
+.char-block,.rel-block,.lore-item,.chapter-block{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #eee}
 .char-block:last-child,.rel-block:last-child,.lore-item:last-child,.chapter-block:last-child{border-bottom:none}
 .tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
 .tag{padding:2px 10px;background:#f0f0f0;border-radius:20px;font-size:12px;color:#555}
 ul{margin:0 0 10px 20px}
-li{margin-bottom:4px;color:#333;font-size:13px}
+li{margin-bottom:4px;color:#444;font-size:13px}
+.event-list{margin:8px 0 0 0;padding-left:18px}
+.event-list li{color:#333;font-size:13px;line-height:1.6}
 .strength{font-size:10px;letter-spacing:1px}
-.tl-item{margin-bottom:18px;padding-left:16px;border-left:2px solid #ddd}
-.tl-header{margin-bottom:6px;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}
-.tl-date,.tl-cat{font-size:11px;color:#888;padding:1px 7px;background:#f0f0f0;border-radius:10px}
-.chapter-meta{font-size:12px;color:#aaa;margin-bottom:8px}
+.tl-item{margin-bottom:14px;padding-left:14px;border-left:2px solid #ddd}
+.tl-header{margin-bottom:4px;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}
+.tl-date{font-size:11px;color:#888;padding:1px 7px;background:#f0f0f0;border-radius:10px}
+.chapter-header{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+.chapter-header h3{margin:0}
+.chapter-meta{font-size:12px;color:#aaa}
 .premise-text{white-space:pre-line}
 .footer{text-align:center;font-size:11px;color:#bbb;padding:32px 0 0}
 
@@ -309,8 +365,8 @@ li{margin-bottom:4px;color:#333;font-size:13px}
   ${loreSection('Factions', data.lore.factions)}
   ${loreSection('Magic & Systems', data.lore.magic)}
   ${loreSection('World Lore', data.lore.worldLore)}
-  ${section('Chapters', chaptersHtml)}
-  ${section('Timeline', timelineHtml)}
+  ${section('Story', storyHtml)}
+  ${worldHistoryHtml ? section('World History', worldHistoryHtml) : ''}
   <div class="footer">Generated by Fief &middot; ${esc(date)}</div>
 </div>
 </body>

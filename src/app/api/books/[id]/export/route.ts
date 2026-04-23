@@ -54,12 +54,12 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   const chapters = (
     db
       .prepare(
-        `SELECT number, title, summary, word_count, characters_appearing
+        `SELECT id, number, title, summary, word_count, characters_appearing
          FROM chapters WHERE book_id = ? AND processing_status = 'done'
          ORDER BY number ASC`
       )
       .all(params.id) as Array<{
-        number: number; title: string; summary: string | null
+        id: string; number: number; title: string; summary: string | null
         word_count: number; characters_appearing: string
       }>
   ).map((c) => ({ ...c, characters_appearing: safeJson<string[]>(c.characters_appearing, []) }))
@@ -67,7 +67,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   const timeline = (
     db
       .prepare(
-        `SELECT title, description, category, characters, in_story_date
+        `SELECT title, description, category, characters, in_story_date, source, source_id
          FROM timeline_events
          WHERE book_id = ? AND (is_correction IS NULL OR is_correction = 0)
          ORDER BY sort_order ASC, created_at ASC`
@@ -75,6 +75,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       .all(params.id) as Array<{
         title: string; description: string | null; category: string | null
         characters: string; in_story_date: string | null
+        source: string; source_id: string | null
       }>
   ).map((e) => ({ ...e, characters: safeJson<string[]>(e.characters, []) }))
 
