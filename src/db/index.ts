@@ -184,6 +184,14 @@ async function runMigrations(): Promise<void> {
   for (const sql of tables) {
     await db.execute(sql)
   }
+
+  // Non-destructive column migrations
+  const columnMigrations = [
+    `ALTER TABLE users ADD COLUMN onboarded INTEGER NOT NULL DEFAULT 0`,
+  ]
+  for (const sql of columnMigrations) {
+    try { await db.execute(sql) } catch { /* column already exists */ }
+  }
 }
 
 // ── Query helpers ─────────────────────────────────────────────────────────────

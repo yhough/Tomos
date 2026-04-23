@@ -4,6 +4,7 @@ import { BookCard } from '@/components/BookCard'
 import { useTheme } from '@/hooks/useTheme'
 import { mockBook, MOCK_BOOK_ID } from '@/lib/mock-data'
 import type { Book } from '@/types'
+import { OnboardingModal } from '@/components/OnboardingModal'
 import { BookOpen, Clock, CreditCard, Home, Library, LogOut, Moon, Plus, Search, Settings, Sparkles, Sun, X } from 'lucide-react'
 
 import Link from 'next/link'
@@ -26,7 +27,7 @@ const MOCK_BOOK_CARD: Book = {
 
 type Tab = 'home' | 'library'
 
-type User = { id: string; name: string; email: string; plan?: string }
+type User = { id: string; name: string; email: string; plan?: string; onboarded?: number }
 
 export default function HomePage() {
   const router = useRouter()

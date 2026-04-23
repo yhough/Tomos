@@ -10,6 +10,7 @@ export type SessionUser = {
   name: string
   email: string
   plan: string
+  onboarded: number
 }
 
 export async function createSession(userId: string): Promise<string> {
@@ -28,7 +29,8 @@ export async function deleteSession(token: string): Promise<void> {
 
 export async function getSessionUser(token: string): Promise<SessionUser | null> {
   return queryFirst<SessionUser>(
-    `SELECT u.id, u.name, u.email, COALESCE(u.plan, 'free') as plan
+    `SELECT u.id, u.name, u.email, COALESCE(u.plan, 'free') as plan,
+            COALESCE(u.onboarded, 0) as onboarded
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token = ? AND s.expires_at > ?`,
