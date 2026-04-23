@@ -17,7 +17,7 @@ import { SearchModal, type SearchResult } from '@/components/SearchModal'
 import { mockBook, mockChapters, mockCharacters, mockLoreSections, mockMessages, mockProcessingSteps, mockRelationships, MOCK_BOOK_ID } from '@/lib/mock-data'
 import { useTheme } from '@/hooks/useTheme'
 import type { ChatMetadata } from '@/types'
-import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Download, Moon, Search, Settings2, Sparkles, Sun, Upload, Zap } from 'lucide-react'
+import { AlertTriangle, ArrowUp, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Download, Moon, Search, Settings2, Sparkles, Sun, Upload, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -515,20 +515,32 @@ function WorldTab({
           {sendError && (
             <p className="text-xs text-red-600 mb-2 px-1">{sendError}</p>
           )}
-          <textarea
-            ref={inputRef}
-            rows={1}
-            value={input}
-            onChange={(e) => { setInput(e.target.value); if (sendError) setSendError(null) }}
-            placeholder="Narrate an event, establish a fact, or ask a question…"
-            className="w-full resize-none overflow-hidden rounded-lg border border-input bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring leading-relaxed"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage()
-              }
-            }}
-          />
+          <div className="relative">
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); if (sendError) setSendError(null) }}
+              placeholder="Narrate an event, establish a fact, or ask a question…"
+              className="w-full resize-none overflow-hidden rounded-lg border border-input bg-card pl-4 pr-11 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring leading-relaxed"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage()
+                }
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              title="Send"
+              style={{ backgroundColor: 'hsl(var(--grimm-accent))' }}
+              className={`absolute right-2 bottom-3 w-7 h-7 rounded-full flex items-center justify-center transition-opacity text-white ${
+                input.trim() && !isTyping ? 'opacity-100 hover:opacity-85 cursor-pointer' : 'opacity-30 cursor-default'
+              }`}
+            >
+              <ArrowUp size={13} />
+            </button>
+          </div>
           <p className="text-[10px] text-muted-foreground/40 mt-1.5 pl-1">
             Enter to send · Shift+Enter for new line
           </p>
