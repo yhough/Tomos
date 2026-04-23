@@ -1,8 +1,9 @@
 'use client'
 
 import { mockChapters, MOCK_BOOK_ID } from '@/lib/mock-data'
-import { AlertTriangle, Edit3, Info, PenLine, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, Edit3, Info, PenLine, ScrollText, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { ChapterTextModal } from './ChapterTextModal'
 
 type Chapter = typeof mockChapters[0]
 
@@ -105,6 +106,7 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
   const [deleting, setDeleting] = useState(false)
   const [editingNumber, setEditingNumber] = useState(false)
   const [numberDraft, setNumberDraft] = useState('')
+  const [textModalOpen, setTextModalOpen] = useState(false)
   const numberInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -569,6 +571,17 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
               {chapter.processed ? `Uploaded ${formatDate(chapter.createdAt)}` : 'Not yet analyzed'}
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
+              {chapter.processed && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setTextModalOpen(true) }}
+                  style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'hsl(var(--grimm-text))')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'hsl(var(--grimm-muted))')}
+                >
+                  <ScrollText size={11} />
+                  View text
+                </button>
+              )}
               <button
                 onClick={() => { setAddingNote(true) }}
                 style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 5 }}
@@ -593,6 +606,15 @@ export function ChapterCard({ chapter, bookId, isExpanded, onToggle, onResolveVi
 
         </div>
       </div>
+
+      <ChapterTextModal
+        chapterId={textModalOpen ? chapter.id : null}
+        chapterNumber={chapter.number}
+        chapterTitle={chapter.title}
+        bookId={bookId}
+        isMock={isMock}
+        onClose={() => setTextModalOpen(false)}
+      />
     </div>
   )
 }

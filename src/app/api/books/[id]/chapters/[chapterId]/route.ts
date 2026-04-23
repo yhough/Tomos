@@ -1,6 +1,22 @@
 import { db } from '@/db'
 import { NextResponse } from 'next/server'
 
+// ── GET /api/books/[id]/chapters/[chapterId] ──────────────────────────────────
+
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string; chapterId: string } }
+) {
+  const chapter = db
+    .prepare('SELECT id, number, title, content, word_count, summary FROM chapters WHERE id = ? AND book_id = ?')
+    .get(params.chapterId, params.id) as {
+      id: string; number: number; title: string; content: string; word_count: number; summary: string | null
+    } | undefined
+
+  if (!chapter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(chapter)
+}
+
 // ── PATCH /api/books/[id]/chapters/[chapterId] ────────────────────────────────
 // Updates the chapter number. If another chapter holds that number, they swap.
 
