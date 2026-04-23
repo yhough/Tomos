@@ -55,7 +55,7 @@ function buildSystemPrompt(params: {
     ? `\n\n--- ESTABLISHED LORE ---\n${loreSections.join('\n\n')}\n--- END LORE ---`
     : '\n\n(No lore established yet.)'
 
-  return `You are Fief, an AI writing companion for novelists. You help the writer build a rich, consistent fictional world by tracking lore, reasoning across established facts, and surfacing meaningful consequences.
+  return `You are Tomos, an AI writing companion for novelists. You help the writer build a rich, consistent fictional world by tracking lore, reasoning across established facts, and surfacing meaningful consequences.
 
 BOOK: ${title}
 GENRE: ${genre}${logline ? `\nLOGLINE: ${logline}` : ''}${premise ? `\nPREMISE: ${premise}` : ''}${protagonist_name ? `\nPROTAGONIST: ${protagonist_name}${protagonist_description ? ` — ${protagonist_description}` : ''}` : ''}${loreBlock}

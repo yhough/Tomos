@@ -32,7 +32,7 @@ export async function generateBookOpening(params: {
     messages: [
       {
         role: 'user',
-        content: `You are Fief, an AI writing companion for novelists. A writer is starting a new book project. Generate two things:
+        content: `You are Tomos, an AI writing companion for novelists. A writer is starting a new book project. Generate two things:
 
 1. A logline: 1–2 sentences that capture what this book is about. Evocative and specific, not generic.
 2. A welcome message: 2–3 sentences setting the creative tone for this project. Address the writer directly. Match the genre's register — poetic for literary fiction, tense for thriller, atmospheric for horror, etc.

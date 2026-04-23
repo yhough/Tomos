@@ -82,7 +82,7 @@ export default function HomePage() {
         {/* Logo */}
         <div className="h-14 flex items-center gap-2 px-4 border-b border-border">
           <Sparkles size={15} className="text-primary" />
-          <span className="text-foreground text-xl" style={{ fontFamily: 'Lumos' }}>Fief</span>
+          <span className="text-foreground text-xl" style={{ fontFamily: 'Lumos' }}>Tomos</span>
         </div>
 
         {/* Nav */}
@@ -320,7 +320,7 @@ function EmptyState() {
       </div>
       <h2 className="text-base font-semibold mb-1">No books yet</h2>
       <p className="text-muted-foreground text-sm max-w-xs mb-5">
-        Start a new book and Fief will help you build its world, track characters, and keep everything consistent.
+        Start a new book and Tomos will help you build its world, track characters, and keep everything consistent.
       </p>
       <Link
         href="/books/new"

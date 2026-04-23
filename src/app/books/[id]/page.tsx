@@ -82,7 +82,7 @@ export default function BookPage({ params }: Props) {
         <div className="px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Sparkles size={16} className="text-primary" />
-            <span className="text-foreground text-xl" style={{ fontFamily: 'Lumos' }}>Fief</span>
+            <span className="text-foreground text-xl" style={{ fontFamily: 'Lumos' }}>Tomos</span>
           </Link>
 
           <nav className="flex items-center gap-1">

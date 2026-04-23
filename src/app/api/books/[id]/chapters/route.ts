@@ -544,7 +544,7 @@ function buildChapterSystemPrompt(params: {
 
   const context = [charBlock, loreBlock, prevBlock, excerptBlock].filter(Boolean).join('\n\n')
 
-  return `You are Fief, an AI writing companion. Analyze the provided chapter and return a structured JSON object.
+  return `You are Tomos, an AI writing companion. Analyze the provided chapter and return a structured JSON object.
 
 BOOK: ${book.title}
 GENRE: ${book.genre}${book.logline ? '\nLOGLINE: ' + book.logline : ''}${book.premise ? '\nPREMISE: ' + book.premise : ''}${book.protagonist_name ? '\nPROTAGONIST: ' + book.protagonist_name : ''}

@@ -51,7 +51,7 @@ export default function SignupPage() {
         <div className="flex items-center gap-2.5">
           <Sparkles size={17} className="text-primary" />
           <span className="text-[26px] text-foreground leading-none" style={{ fontFamily: 'Lumos' }}>
-            Fief
+            Tomos
           </span>
         </div>
 
@@ -63,7 +63,7 @@ export default function SignupPage() {
             "A writer's greatest fear is forgetting what they already built."
           </p>
           <p className="text-sm text-muted-foreground mt-5 leading-relaxed">
-            Fief remembers everything — so you don't have to. Start writing and let the world take care of itself.
+            Tomos remembers everything — so you don't have to. Start writing and let the world take care of itself.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export default function SignupPage() {
 
         <div className="flex items-center gap-2 mb-10 lg:hidden">
           <Sparkles size={15} className="text-primary" />
-          <span className="text-2xl text-foreground" style={{ fontFamily: 'Lumos' }}>Fief</span>
+          <span className="text-2xl text-foreground" style={{ fontFamily: 'Lumos' }}>Tomos</span>
         </div>
 
         <div className="w-full max-w-sm">

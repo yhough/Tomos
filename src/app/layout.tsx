@@ -13,8 +13,8 @@ const lora = Lora({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Fief',
-    template: '%s — Fief',
+    default: 'Tomos',
+    template: '%s — Tomos',
   },
   description: 'AI-powered writing companion for novelists and long-form writers.',
 }

@@ -177,7 +177,7 @@ export default function NewBookPage() {
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">New Book</h1>
               <p className="text-muted-foreground text-sm mt-0.5">
-                Lay down the foundations — Fief will build your world from here.
+                Lay down the foundations — Tomos will build your world from here.
               </p>
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function NewBookPage() {
                   className={`${inputCls} resize-none`}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Fief uses this to generate your world logline and opening message.
+                  Tomos uses this to generate your world logline and opening message.
                 </p>
               </div>
 
@@ -463,7 +463,7 @@ export default function NewBookPage() {
               </div>
 
               <p className="text-xs text-muted-foreground text-center -mt-1">
-                Fief will generate your world logline and an opening message from everything you've entered.
+                Tomos will generate your world logline and an opening message from everything you've entered.
               </p>
             </div>
           )}

@@ -50,20 +50,20 @@ export default function LoginPage() {
         <div className="flex items-center gap-2.5">
           <Sparkles size={17} className="text-primary" />
           <span className="text-[26px] text-foreground leading-none" style={{ fontFamily: 'Lumos' }}>
-            Fief
+            Tomos
           </span>
         </div>
 
         {/* Definition + description */}
         <div>
           <p className="text-xs font-medium tracking-widest text-muted-foreground/60 uppercase mb-3">
-            fief
+            tomos
           </p>
           <p
             className="text-[21px] leading-snug text-foreground"
             style={{ fontFamily: 'var(--font-playfair)', fontStyle: 'italic' }}
           >
-            A person's sphere of operation or control.
+            A tome; a weighty written work or volume.
           </p>
           <p className="text-sm text-muted-foreground mt-5 leading-relaxed">
             Bring your world to life.
@@ -92,7 +92,7 @@ export default function LoginPage() {
         {/* Mobile logo */}
         <div className="flex items-center gap-2 mb-10 lg:hidden">
           <Sparkles size={15} className="text-primary" />
-          <span className="text-2xl text-foreground" style={{ fontFamily: 'Lumos' }}>Fief</span>
+          <span className="text-2xl text-foreground" style={{ fontFamily: 'Lumos' }}>Tomos</span>
         </div>
 
         <div className="w-full max-w-sm">
