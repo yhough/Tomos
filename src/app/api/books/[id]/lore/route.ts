@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   db.prepare(`
     INSERT INTO book_state_entries (id, book_id, type, name, summary, data, source, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, 'chat', ?, ?)
   `).run(id, params.id, type, name.trim(), summary?.trim() ?? null, merged, now, now)
 
   const entry = db.prepare(`SELECT id, name, summary, type, data FROM book_state_entries WHERE id = ?`).get(id)
