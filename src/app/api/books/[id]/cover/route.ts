@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import { queryFirst, execute } from '@/db'
 import { mkdir, writeFile } from 'fs/promises'
 import { NextResponse } from 'next/server'
 import { join } from 'path'
@@ -14,7 +14,7 @@ const ALLOWED_TYPES: Record<string, string> = {
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const book = db.prepare('SELECT id FROM books WHERE id = ?').get(params.id)
+  const book = await queryFirst('SELECT id FROM books WHERE id = ?', [params.id])
   if (!book) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   let formData: FormData
@@ -45,19 +45,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   await writeFile(join(dir, filename), Buffer.from(await file.arrayBuffer()))
 
   const coverPath = `/covers/${filename}`
-  db.prepare('UPDATE books SET cover_image = ?, updated_at = ? WHERE id = ?').run(
-    coverPath,
-    Date.now(),
-    params.id
+  await execute(
+    'UPDATE books SET cover_image = ?, updated_at = ? WHERE id = ?',
+    [coverPath, Date.now(), params.id]
   )
 
   return NextResponse.json({ cover_image: coverPath })
 }
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
-  db.prepare('UPDATE books SET cover_image = NULL, updated_at = ? WHERE id = ?').run(
-    Date.now(),
-    params.id
+  await execute(
+    'UPDATE books SET cover_image = NULL, updated_at = ? WHERE id = ?',
+    [Date.now(), params.id]
   )
   return NextResponse.json({ cover_image: null })
 }

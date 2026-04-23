@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import { queryFirst, execute } from '@/db'
 import { cookies } from 'next/headers'
 import { nanoid } from 'nanoid'
 
@@ -12,28 +12,28 @@ export type SessionUser = {
   plan: string
 }
 
-export function createSession(userId: string): string {
+export async function createSession(userId: string): Promise<string> {
   const token = nanoid(48)
   const now = Date.now()
-  db.prepare(`
-    INSERT INTO sessions (token, user_id, expires_at, created_at)
-    VALUES (?, ?, ?, ?)
-  `).run(token, userId, now + SESSION_DURATION_MS, now)
+  await execute(
+    `INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)`,
+    [token, userId, now + SESSION_DURATION_MS, now]
+  )
   return token
 }
 
-export function deleteSession(token: string) {
-  db.prepare(`DELETE FROM sessions WHERE token = ?`).run(token)
+export async function deleteSession(token: string): Promise<void> {
+  await execute(`DELETE FROM sessions WHERE token = ?`, [token])
 }
 
-export function getSessionUser(token: string): SessionUser | null {
-  const row = db.prepare(`
-    SELECT u.id, u.name, u.email, COALESCE(u.plan, 'free') as plan
-    FROM sessions s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.token = ? AND s.expires_at > ?
-  `).get(token, Date.now()) as SessionUser | undefined
-  return row ?? null
+export async function getSessionUser(token: string): Promise<SessionUser | null> {
+  return queryFirst<SessionUser>(
+    `SELECT u.id, u.name, u.email, COALESCE(u.plan, 'free') as plan
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token = ? AND s.expires_at > ?`,
+    [token, Date.now()]
+  )
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
@@ -57,4 +57,3 @@ export function setSessionCookie(token: string): string {
 export function clearSessionCookie(): string {
   return `${COOKIE_NAME}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`
 }
-

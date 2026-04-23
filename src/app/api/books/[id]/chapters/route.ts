@@ -1,9 +1,7 @@
-import { db } from '@/db'
+import { queryFirst, queryAll, execute } from '@/db'
 import { generateId } from '@/lib/utils'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -26,17 +24,11 @@ function balanceJson(s: string): string {
     else if (ch === '}' || ch === ']') stack.pop()
   }
 
-  // Close any open string
   if (inString) s += '"'
-
-  // Remove a trailing incomplete key or comma before closing
   s = s.replace(/,\s*$/, '').replace(/,\s*([}\]])/, '$1')
-
-  // Close all open structures in reverse order
   for (let i = stack.length - 1; i >= 0; i--) {
     s += stack[i] === '{' ? '}' : ']'
   }
-
   return s
 }
 
@@ -99,23 +91,23 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
-  const chapters = db
-    .prepare(
-      `SELECT id, number, title, word_count, summary, processing_status, processing_step,
-              correction_notes, characters_appearing, created_at
-       FROM chapters WHERE book_id = ? ORDER BY number ASC`
-    )
-    .all(params.id) as DbChapter[]
+  const chapters = await queryAll<DbChapter>(
+    `SELECT id, number, title, word_count, summary, processing_status, processing_step,
+            correction_notes, characters_appearing, created_at
+     FROM chapters WHERE book_id = ? ORDER BY number ASC`,
+    [params.id]
+  )
 
-  const result = chapters.map((ch) => {
-    const flags = db
-      .prepare(
+  const result = await Promise.all(
+    chapters.map(async (ch) => {
+      const flags = await queryAll<DbFlag>(
         `SELECT id, description, severity, category, resolved, resolved_by
-         FROM continuity_flags WHERE chapter_id = ? ORDER BY created_at ASC`
+         FROM continuity_flags WHERE chapter_id = ? ORDER BY created_at ASC`,
+        [ch.id]
       )
-      .all(ch.id) as DbFlag[]
-    return formatChapter(ch, flags)
-  })
+      return formatChapter(ch, flags)
+    })
+  )
 
   return NextResponse.json(result)
 }
@@ -140,12 +132,13 @@ export async function POST(
       return NextResponse.json({ error: 'title is required' }, { status: 400 })
     }
 
-    const book = db.prepare(
-      'SELECT id, title, genre, premise, protagonist_name, logline FROM books WHERE id = ?'
-    ).get(params.id) as {
+    const book = await queryFirst<{
       id: string; title: string; genre: string; premise: string | null
       protagonist_name: string | null; logline: string | null
-    } | undefined
+    }>(
+      'SELECT id, title, genre, premise, protagonist_name, logline FROM books WHERE id = ?',
+      [params.id]
+    )
 
     if (!book) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -153,10 +146,10 @@ export async function POST(
     const chapterId = generateId()
     const wordCount = content.trim().split(/\s+/).length
 
-    // Reject duplicate chapter numbers
-    const existing = db.prepare(
-      'SELECT id FROM chapters WHERE book_id = ? AND number = ?'
-    ).get(params.id, number) as { id: string } | undefined
+    const existing = await queryFirst<{ id: string }>(
+      'SELECT id FROM chapters WHERE book_id = ? AND number = ?',
+      [params.id, number]
+    )
 
     if (existing) {
       return NextResponse.json(
@@ -165,51 +158,42 @@ export async function POST(
       )
     }
 
-    db.prepare(
+    await execute(
       `INSERT INTO chapters (id, book_id, number, title, content, word_count,
        processing_status, processing_step, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'processing', 'Analyzing with AI', ?, ?)`
-    ).run(chapterId, params.id, number, title.trim(), content.trim(), wordCount, now, now)
+       VALUES (?, ?, ?, ?, ?, ?, 'processing', 'Analyzing with AI', ?, ?)`,
+      [chapterId, params.id, number, title.trim(), content.trim(), wordCount, now, now]
+    )
 
-    const finalChapterId = chapterId
+    const stateEntries = await queryAll<{ type: string; name: string; summary: string | null; data: string }>(
+      'SELECT type, name, summary, data FROM book_state_entries WHERE book_id = ? ORDER BY updated_at DESC',
+      [params.id]
+    )
 
-    // Fetch context for the AI
-    const stateEntries = db
-      .prepare(
-        'SELECT type, name, summary, data FROM book_state_entries WHERE book_id = ? ORDER BY updated_at DESC'
-      )
-      .all(params.id) as Array<{ type: string; name: string; summary: string | null; data: string }>
+    const characters = await queryAll<{ name: string; role: string; description: string | null; status: string }>(
+      'SELECT name, role, description, status FROM characters WHERE book_id = ? ORDER BY name ASC',
+      [params.id]
+    )
 
-    const characters = db
-      .prepare(
-        'SELECT name, role, description, status FROM characters WHERE book_id = ? ORDER BY name ASC'
-      )
-      .all(params.id) as Array<{ name: string; role: string; description: string | null; status: string }>
+    const previousChapters = await queryAll<{ number: number; title: string; summary: string | null }>(
+      `SELECT number, title, summary FROM chapters
+       WHERE book_id = ? AND number < ? AND processing_status = 'done'
+       ORDER BY number ASC`,
+      [params.id, number]
+    )
 
-    const previousChapters = db
-      .prepare(
-        `SELECT number, title, summary FROM chapters
-         WHERE book_id = ? AND number < ? AND processing_status = 'done'
-         ORDER BY number ASC`
-      )
-      .all(params.id, number) as Array<{ number: number; title: string; summary: string | null }>
-
-    // Fetch content excerpts from ALL previous chapters (not just done) for duplicate detection.
-    // We use the opening words of every chapter + closing words of the immediately preceding one.
-    const allPreviousContent = db
-      .prepare(
-        `SELECT number, title, content FROM chapters
-         WHERE book_id = ? AND id != ? AND content != ''
-         ORDER BY number ASC`
-      )
-      .all(params.id, finalChapterId) as Array<{ number: number; title: string; content: string }>
+    const allPreviousContent = await queryAll<{ number: number; title: string; content: string }>(
+      `SELECT number, title, content FROM chapters
+       WHERE book_id = ? AND id != ? AND content != ''
+       ORDER BY number ASC`,
+      [params.id, chapterId]
+    )
 
     const prevChapterNumber = number - 1
     const previousExcerpts = allPreviousContent.map((ch) => ({
       number: ch.number,
       title: ch.title,
       opening: firstWords(ch.content, 60),
-      // Include a larger closing excerpt for the immediately preceding chapter
       closing: lastWords(ch.content, ch.number === prevChapterNumber ? 120 : 40),
     }))
 
@@ -221,40 +205,31 @@ export async function POST(
       previousExcerpts,
     })
 
-    // Call Claude
     const client = getClient()
     const aiResponse = await client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 8000,
       system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: `Analyze Chapter ${number}: "${title}"\n\n${content.trim()}`,
-        },
-      ],
+      messages: [{ role: 'user', content: `Analyze Chapter ${number}: "${title}"\n\n${content.trim()}` }],
     })
 
     const wasTruncated = aiResponse.stop_reason === 'max_tokens'
     const rawText = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : ''
 
-    // Strip markdown fences in case Claude added them despite instructions
     const cleaned = rawText
       .replace(/^```(?:json)?\s*/m, '')
       .replace(/\s*```\s*$/m, '')
       .trim()
 
-    let parsed: ChapterAnalysis
+    let parsed: ChapterAnalysis = { summary: '', state_updates: [], characters: [], continuity_flags: [], timeline_events: [] }
     let parseOk = false
 
-    // 1. Try normal parse
     try {
       const jsonStr = cleaned.match(/\{[\s\S]*\}/)?.[0] ?? ''
       if (!jsonStr) throw new Error('no JSON block found')
       parsed = JSON.parse(jsonStr) as ChapterAnalysis
       parseOk = !!parsed.summary?.trim()
     } catch {
-      // 2. If truncated, try to balance open brackets and parse again
       if (wasTruncated) {
         try {
           const partial = cleaned.match(/\{[\s\S]*/)?.[0] ?? ''
@@ -271,9 +246,10 @@ export async function POST(
       const reason = wasTruncated
         ? 'Chapter too long to analyze in one pass — try splitting it into smaller sections'
         : 'AI response could not be parsed — please try again'
-      db.prepare(
-        `UPDATE chapters SET processing_status = 'error', processing_step = ?, updated_at = ? WHERE id = ?`
-      ).run(reason, Date.now(), finalChapterId)
+      await execute(
+        `UPDATE chapters SET processing_status = 'error', processing_step = ?, updated_at = ? WHERE id = ?`,
+        [reason, Date.now(), chapterId]
+      )
       return NextResponse.json({ error: reason }, { status: 422 })
     }
 
@@ -284,22 +260,19 @@ export async function POST(
     for (const e of parsed.timeline_events ?? []) for (const n of e.characters ?? []) charSet.add(n)
     const charactersAppearing = Array.from(charSet)
 
-    db.prepare(
+    await execute(
       `UPDATE chapters SET summary = ?, processing_status = 'done', processing_step = NULL,
-       characters_appearing = ?, updated_at = ? WHERE id = ?`
-    ).run(
-      parsed.summary ?? '',
-      JSON.stringify(charactersAppearing),
-      Date.now(),
-      finalChapterId
+       characters_appearing = ?, updated_at = ? WHERE id = ?`,
+      [parsed.summary ?? '', JSON.stringify(charactersAppearing), Date.now(), chapterId]
     )
 
     // Upsert characters
     for (const c of parsed.characters ?? []) {
       if (!c.name?.trim()) continue
-      const existingChar = db
-        .prepare('SELECT id, data FROM characters WHERE book_id = ? AND name = ?')
-        .get(params.id, c.name) as { id: string; data: string } | undefined
+      const existingChar = await queryFirst<{ id: string; data: string }>(
+        'SELECT id, data FROM characters WHERE book_id = ? AND name = ?',
+        [params.id, c.name]
+      )
 
       if (existingChar) {
         let data: Record<string, unknown> = {}
@@ -313,40 +286,37 @@ export async function POST(
         if (c.notable_moments?.length) {
           data.notable_moments = [...(data.notable_moments as string[] ?? []), ...c.notable_moments]
         }
-        db.prepare(
+        await execute(
           `UPDATE characters SET description = COALESCE(?, description),
-           status = COALESCE(?, status), data = ?, updated_at = ? WHERE id = ?`
-        ).run(c.description ?? null, c.status ?? null, JSON.stringify(data), Date.now(), existingChar.id)
+           status = COALESCE(?, status), data = ?, updated_at = ? WHERE id = ?`,
+          [c.description ?? null, c.status ?? null, JSON.stringify(data), Date.now(), existingChar.id]
+        )
       } else {
         const newId = generateId()
         const data = JSON.stringify({
           traits: c.traits ?? [],
           relationships: [],
           notable_moments: c.notable_moments ?? [],
-          appearances: [finalChapterId],
+          appearances: [chapterId],
         })
-        db.prepare(
+        await execute(
           `INSERT INTO characters (id, book_id, name, role, description, status, data, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          newId, params.id, c.name,
-          c.role ?? 'minor',
-          c.description ?? '',
-          c.status ?? 'unknown',
-          data,
-          Date.now(), Date.now()
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newId, params.id, c.name, c.role ?? 'minor', c.description ?? '', c.status ?? 'unknown', data, Date.now(), Date.now()]
         )
       }
     }
 
-    // Upsert relationships extracted from this chapter
+    // Upsert relationships
     for (const rel of parsed.relationship_updates ?? []) {
-      const charA = db
-        .prepare('SELECT id FROM characters WHERE book_id = ? AND name = ?')
-        .get(params.id, rel.character_a) as { id: string } | undefined
-      const charB = db
-        .prepare('SELECT id FROM characters WHERE book_id = ? AND name = ?')
-        .get(params.id, rel.character_b) as { id: string } | undefined
+      const charA = await queryFirst<{ id: string }>(
+        'SELECT id FROM characters WHERE book_id = ? AND name = ?',
+        [params.id, rel.character_a]
+      )
+      const charB = await queryFirst<{ id: string }>(
+        'SELECT id FROM characters WHERE book_id = ? AND name = ?',
+        [params.id, rel.character_b]
+      )
       if (!charA || !charB || charA.id === charB.id) continue
 
       const [aId, bId] = [charA.id, charB.id].sort()
@@ -354,104 +324,93 @@ export async function POST(
       const strength = Math.min(5, Math.max(1, rel.strength ?? 1))
       const status = rel.status ?? 'unknown'
 
-      const existingRel = db
-        .prepare('SELECT id FROM character_relationships WHERE character_a_id = ? AND character_b_id = ?')
-        .get(aId, bId) as { id: string } | undefined
+      const existingRel = await queryFirst<{ id: string }>(
+        'SELECT id FROM character_relationships WHERE character_a_id = ? AND character_b_id = ?',
+        [aId, bId]
+      )
 
       if (existingRel) {
-        db.prepare(
+        await execute(
           `UPDATE character_relationships SET type = ?, description = COALESCE(?, description),
-           strength = ?, status = ?, updated_at = ? WHERE id = ?`
-        ).run(type, rel.description ?? null, strength, status, Date.now(), existingRel.id)
+           strength = ?, status = ?, updated_at = ? WHERE id = ?`,
+          [type, rel.description ?? null, strength, status, Date.now(), existingRel.id]
+        )
       } else {
-        db.prepare(
+        await execute(
           `INSERT INTO character_relationships
              (id, book_id, character_a_id, character_b_id, type, description, strength, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(generateId(), params.id, aId, bId, type, rel.description ?? null, strength, status, Date.now(), Date.now())
-      }
-    }
-
-    // Upsert lore / world-state entries
-    for (const u of parsed.state_updates ?? []) {
-      if (!u.name?.trim() || !u.type) continue
-      const existingEntry = db
-        .prepare('SELECT id FROM book_state_entries WHERE book_id = ? AND type = ? AND name = ?')
-        .get(params.id, u.type, u.name) as { id: string } | undefined
-
-      if (existingEntry) {
-        db.prepare(
-          `UPDATE book_state_entries SET summary = ?, data = ?, updated_at = ? WHERE id = ?`
-        ).run(u.summary ?? '', JSON.stringify(u.data ?? {}), Date.now(), existingEntry.id)
-      } else {
-        db.prepare(
-          `INSERT INTO book_state_entries (id, book_id, type, name, summary, data, source, source_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'chapter', ?, ?, ?)`
-        ).run(
-          generateId(), params.id, u.type, u.name,
-          u.summary ?? '', JSON.stringify(u.data ?? {}),
-          finalChapterId, Date.now(), Date.now()
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [generateId(), params.id, aId, bId, type, rel.description ?? null, strength, status, Date.now(), Date.now()]
         )
       }
     }
 
-    // Insert continuity flags (clear old ones for this chapter first)
-    db.prepare('DELETE FROM continuity_flags WHERE chapter_id = ?').run(finalChapterId)
+    // Upsert lore entries
+    for (const u of parsed.state_updates ?? []) {
+      if (!u.name?.trim() || !u.type) continue
+      const existingEntry = await queryFirst<{ id: string }>(
+        'SELECT id FROM book_state_entries WHERE book_id = ? AND type = ? AND name = ?',
+        [params.id, u.type, u.name]
+      )
+
+      if (existingEntry) {
+        await execute(
+          `UPDATE book_state_entries SET summary = ?, data = ?, updated_at = ? WHERE id = ?`,
+          [u.summary ?? '', JSON.stringify(u.data ?? {}), Date.now(), existingEntry.id]
+        )
+      } else {
+        await execute(
+          `INSERT INTO book_state_entries (id, book_id, type, name, summary, data, source, source_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'chapter', ?, ?, ?)`,
+          [generateId(), params.id, u.type, u.name, u.summary ?? '', JSON.stringify(u.data ?? {}), chapterId, Date.now(), Date.now()]
+        )
+      }
+    }
+
+    // Insert continuity flags
+    await execute('DELETE FROM continuity_flags WHERE chapter_id = ?', [chapterId])
     for (const flag of parsed.continuity_flags ?? []) {
       if (!flag.description?.trim()) continue
-      db.prepare(
+      await execute(
         `INSERT INTO continuity_flags (id, chapter_id, book_id, description, severity, category, resolved, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
-      ).run(
-        generateId(), finalChapterId, params.id,
-        flag.description,
-        flag.severity ?? 'warning',
-        flag.category ?? 'continuity',
-        Date.now()
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+        [generateId(), chapterId, params.id, flag.description, flag.severity ?? 'warning', flag.category ?? 'continuity', Date.now()]
       )
     }
 
     // Insert timeline events
     for (const event of parsed.timeline_events ?? []) {
       if (!event.title?.trim()) continue
-      const maxOrder = (db
-        .prepare('SELECT MAX(sort_order) as m FROM timeline_events WHERE book_id = ?')
-        .get(params.id) as { m: number | null })?.m ?? 0
+      const maxOrderRow = await queryFirst<{ m: number | null }>(
+        'SELECT MAX(sort_order) as m FROM timeline_events WHERE book_id = ?',
+        [params.id]
+      )
+      const maxOrder = maxOrderRow?.m ?? 0
 
-      db.prepare(
+      await execute(
         `INSERT INTO timeline_events
          (id, book_id, title, description, source, source_id, in_story_date, sort_order, created_at, category, characters)
-         VALUES (?, ?, ?, ?, 'chapter', ?, ?, ?, ?, 'story', ?)`
-      ).run(
-        generateId(), params.id,
-        event.title,
-        event.description ?? '',
-        finalChapterId,
-        event.in_story_date ?? null,
-        maxOrder + 1,
-        Date.now(),
-        JSON.stringify(event.characters ?? [])
+         VALUES (?, ?, ?, ?, 'chapter', ?, ?, ?, ?, 'story', ?)`,
+        [generateId(), params.id, event.title, event.description ?? '', chapterId, event.in_story_date ?? null, maxOrder + 1, Date.now(), JSON.stringify(event.characters ?? [])]
       )
     }
 
-    // Bump book updated_at
-    db.prepare('UPDATE books SET updated_at = ? WHERE id = ?').run(Date.now(), params.id)
+    await execute('UPDATE books SET updated_at = ? WHERE id = ?', [Date.now(), params.id])
 
-    // Return the formatted chapter
-    const updatedChapter = db.prepare(
+    const updatedChapter = await queryFirst<DbChapter>(
       `SELECT id, number, title, word_count, summary, processing_status, processing_step,
               correction_notes, characters_appearing, created_at
-       FROM chapters WHERE id = ?`
-    ).get(finalChapterId) as DbChapter
+       FROM chapters WHERE id = ?`,
+      [chapterId]
+    )
 
-    const flags = db
-      .prepare(
-        `SELECT id, description, severity, category, resolved, resolved_by
-         FROM continuity_flags WHERE chapter_id = ? ORDER BY created_at ASC`
-      )
-      .all(finalChapterId) as DbFlag[]
+    const flags = await queryAll<DbFlag>(
+      `SELECT id, description, severity, category, resolved, resolved_by
+       FROM continuity_flags WHERE chapter_id = ? ORDER BY created_at ASC`,
+      [chapterId]
+    )
 
-    return NextResponse.json(formatChapter(updatedChapter, flags))
+    return NextResponse.json(formatChapter(updatedChapter!, flags))
   } catch (err) {
     console.error('[chapters POST] error:', err)
     const message = err instanceof Error ? err.message : 'Internal server error'
@@ -504,8 +463,6 @@ interface ChapterAnalysis {
   }>
 }
 
-// ── System prompt ─────────────────────────────────────────────────────────────
-
 function buildChapterSystemPrompt(params: {
   book: { title: string; genre: string; premise: string | null; protagonist_name: string | null; logline: string | null }
   stateEntries: Array<{ type: string; name: string; summary: string | null; data: string }>
@@ -554,74 +511,23 @@ ${context}
 Respond ONLY with valid JSON — no markdown fences, no commentary:
 {
   "summary": "2–4 sentences covering the chapter's key events and their significance",
-  "characters": [
-    {
-      "name": "exact name as used in chapter",
-      "action": "create" | "update",
-      "role": "protagonist" | "antagonist" | "supporting" | "minor",
-      "status": "alive" | "dead" | "unknown" | "ambiguous",
-      "description": "updated one-line description based on what we know after this chapter",
-      "traits": ["trait1"],
-      "notable_moments": ["what happened to them in this chapter"]
-    }
-  ],
-  "relationship_updates": [
-    {
-      "character_a": "exact name as used in chapter",
-      "character_b": "exact name as used in chapter",
-      "type": "ally" | "enemy" | "neutral" | "romantic" | "family" | "mentor" | "rival" | "unknown",
-      "description": "one sentence describing the relationship as revealed in this chapter",
-      "strength": 1-5,
-      "status": "active" | "strained" | "broken" | "unknown"
-    }
-  ],
-  "state_updates": [
-    {
-      "type": "location" | "faction" | "world_fact" | "event" | "misc",
-      "name": "entity name",
-      "action": "create" | "update",
-      "summary": "brief description",
-      "data": {}
-    }
-  ],
-  "continuity_flags": [
-    {
-      "description": "clear description of the issue",
-      "severity": "error" | "warning" | "info",
-      "category": "continuity" | "character" | "narrative" | "duplicate"
-    }
-  ],
-  "timeline_events": [
-    {
-      "title": "short event title",
-      "description": "1–2 sentence description of what happened",
-      "in_story_date": "in-universe date if mentioned, else null",
-      "characters": ["Character Name"]
-    }
-  ]
+  "characters": [{"name":"...","action":"create"|"update","role":"...","status":"...","description":"...","traits":["..."],"notable_moments":["..."]}],
+  "relationship_updates": [{"character_a":"...","character_b":"...","type":"ally"|"enemy"|"neutral"|"romantic"|"family"|"mentor"|"rival"|"unknown","description":"...","strength":1-5,"status":"active"|"strained"|"broken"|"unknown"}],
+  "state_updates": [{"type":"location"|"faction"|"world_fact"|"event"|"misc","name":"...","action":"create"|"update","summary":"...","data":{}}],
+  "continuity_flags": [{"description":"...","severity":"error"|"warning"|"info","category":"continuity"|"character"|"narrative"|"duplicate"}],
+  "timeline_events": [{"title":"...","description":"...","in_story_date":null,"characters":["..."]}]
 }
 
 Rules:
-- continuity_flags severity: "error" = direct contradiction with established facts; "warning" = possible inconsistency or notable concern; "info" = minor observation
-- continuity_flags category:
-  "continuity" = factual contradiction (wrong location, impossible timeline, dead character reappears, etc.)
-  "character" = character acts against their established personality, motivation, or arc
-  "narrative" = unexplained gap in logic, missing cause-and-effect, pacing issue, or plot hole
-  "duplicate" = content that is repeated verbatim or near-verbatim from a previous chapter OR repeated within this chapter itself; use severity "error" if the entire chapter appears to be a duplicate of a previous one, "warning" for a repeated scene or passage
-- For duplicate detection: compare this chapter's opening and body against the PREVIOUS CHAPTER CONTENT FINGERPRINTS provided. Also scan within this chapter for any scenes, paragraphs, or passages that appear more than once.
-- Only flag real issues — don't invent problems
-- relationship_updates: only include pairs where the chapter clearly reveals or confirms their dynamic; strength 1=peripheral acquaintance, 3=significant bond, 5=defining relationship
+- Only flag real issues
 - Only include characters who actually appear in this chapter
-- Only include state_updates for newly established facts or significant updates
-- Keep the summary grounded in what actually happens in the chapter`
+- Keep the summary grounded in what actually happens`
 }
 
-// Extract the first N words from a body of text
 function firstWords(text: string, n: number): string {
   return text.trim().split(/\s+/).slice(0, n).join(' ')
 }
 
-// Extract the last N words from a body of text
 function lastWords(text: string, n: number): string {
   const words = text.trim().split(/\s+/)
   return words.slice(Math.max(0, words.length - n)).join(' ')

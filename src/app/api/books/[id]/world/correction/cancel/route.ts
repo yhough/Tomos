@@ -1,4 +1,4 @@
-import { db } from '@/db'
+import { execute } from '@/db'
 import { NextResponse } from 'next/server'
 
 export async function POST(
@@ -8,9 +8,10 @@ export async function POST(
   try {
     const { worldMessageId } = await req.json() as { worldMessageId: string }
 
-    db.prepare(
-      "UPDATE chat_messages SET correction_status = 'cancelled' WHERE id = ? AND book_id = ?"
-    ).run(worldMessageId, params.id)
+    await execute(
+      "UPDATE chat_messages SET correction_status = 'cancelled' WHERE id = ? AND book_id = ?",
+      [worldMessageId, params.id]
+    )
 
     return NextResponse.json({ success: true })
   } catch (err) {

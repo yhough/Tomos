@@ -1,24 +1,20 @@
-import { db } from '@/db'
+import { queryFirst, queryAll, execute, batchWrite } from '@/db'
 import { NextResponse } from 'next/server'
-
-// ── GET /api/books/[id]/chapters/[chapterId] ──────────────────────────────────
 
 export async function GET(
   _req: Request,
   { params }: { params: { id: string; chapterId: string } }
 ) {
-  const chapter = db
-    .prepare('SELECT id, number, title, content, word_count, summary FROM chapters WHERE id = ? AND book_id = ?')
-    .get(params.chapterId, params.id) as {
-      id: string; number: number; title: string; content: string; word_count: number; summary: string | null
-    } | undefined
+  const chapter = await queryFirst<{
+    id: string; number: number; title: string; content: string; word_count: number; summary: string | null
+  }>(
+    'SELECT id, number, title, content, word_count, summary FROM chapters WHERE id = ? AND book_id = ?',
+    [params.chapterId, params.id]
+  )
 
   if (!chapter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(chapter)
 }
-
-// ── PATCH /api/books/[id]/chapters/[chapterId] ────────────────────────────────
-// Updates the chapter number. If another chapter holds that number, they swap.
 
 export async function PATCH(
   req: Request,
@@ -30,56 +26,48 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid chapter number' }, { status: 400 })
   }
 
-  const chapter = db
-    .prepare('SELECT id, number FROM chapters WHERE id = ? AND book_id = ?')
-    .get(params.chapterId, params.id) as { id: string; number: number } | undefined
+  const chapter = await queryFirst<{ id: string; number: number }>(
+    'SELECT id, number FROM chapters WHERE id = ? AND book_id = ?',
+    [params.chapterId, params.id]
+  )
 
   if (!chapter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (chapter.number === newNumber) return NextResponse.json({ ok: true })
 
-  const conflict = db
-    .prepare('SELECT id FROM chapters WHERE book_id = ? AND number = ?')
-    .get(params.id, newNumber) as { id: string } | undefined
+  const conflict = await queryFirst<{ id: string }>(
+    'SELECT id FROM chapters WHERE book_id = ? AND number = ?',
+    [params.id, newNumber]
+  )
 
-  db.transaction(() => {
-    if (conflict) {
-      // Swap: give the conflicting chapter the old number
-      db.prepare('UPDATE chapters SET number = ? WHERE id = ?').run(chapter.number, conflict.id)
-    }
-    db.prepare('UPDATE chapters SET number = ? WHERE id = ?').run(newNumber, params.chapterId)
-    db.prepare('UPDATE books SET updated_at = ? WHERE id = ?').run(Date.now(), params.id)
-  })()
+  const statements: Array<{ sql: string; args: unknown[] }> = []
+  if (conflict) {
+    statements.push({ sql: 'UPDATE chapters SET number = ? WHERE id = ?', args: [chapter.number, conflict.id] })
+  }
+  statements.push({ sql: 'UPDATE chapters SET number = ? WHERE id = ?', args: [newNumber, params.chapterId] })
+  statements.push({ sql: 'UPDATE books SET updated_at = ? WHERE id = ?', args: [Date.now(), params.id] })
 
+  await batchWrite(statements)
   return NextResponse.json({ ok: true })
 }
-
-// ── DELETE /api/books/[id]/chapters/[chapterId] ───────────────────────────────
-// Deletes the chapter and all data sourced from it:
-//   - timeline events, world-state entries, continuity flags, annotations (cascade)
-//   - characters that only appeared in this chapter
 
 export async function DELETE(
   _req: Request,
   { params }: { params: { id: string; chapterId: string } }
 ) {
-  const chapter = db
-    .prepare('SELECT id, number, characters_appearing FROM chapters WHERE id = ? AND book_id = ?')
-    .get(params.chapterId, params.id) as {
-      id: string; number: number; characters_appearing: string
-    } | undefined
+  const chapter = await queryFirst<{ id: string; number: number; characters_appearing: string }>(
+    'SELECT id, number, characters_appearing FROM chapters WHERE id = ? AND book_id = ?',
+    [params.chapterId, params.id]
+  )
 
-  if (!chapter) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
+  if (!chapter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Parse character names that appeared in this chapter
   let chapterCharNames: string[] = []
   try { chapterCharNames = JSON.parse(chapter.characters_appearing) } catch { /* ok */ }
 
-  // Build the set of character names that appear in at least one other chapter
-  const otherChapters = db
-    .prepare('SELECT characters_appearing FROM chapters WHERE book_id = ? AND id != ?')
-    .all(params.id, params.chapterId) as Array<{ characters_appearing: string }>
+  const otherChapters = await queryAll<{ characters_appearing: string }>(
+    'SELECT characters_appearing FROM chapters WHERE book_id = ? AND id != ?',
+    [params.id, params.chapterId]
+  )
 
   const namesElsewhere = new Set<string>()
   for (const ch of otherChapters) {
@@ -89,36 +77,23 @@ export async function DELETE(
     } catch { /* ok */ }
   }
 
-  db.transaction(() => {
-    // 1. Delete timeline events sourced from this chapter
-    db.prepare(
-      `DELETE FROM timeline_events WHERE source = 'chapter' AND source_id = ?`
-    ).run(params.chapterId)
+  const statements: Array<{ sql: string; args: unknown[] }> = [
+    { sql: `DELETE FROM timeline_events WHERE source = 'chapter' AND source_id = ?`, args: [params.chapterId] },
+    { sql: `DELETE FROM book_state_entries WHERE source = 'chapter' AND source_id = ?`, args: [params.chapterId] },
+    { sql: 'DELETE FROM chapters WHERE id = ?', args: [params.chapterId] },
+    { sql: 'UPDATE chapters SET number = number - 1 WHERE book_id = ? AND number > ?', args: [params.id, chapter.number] },
+    { sql: 'UPDATE books SET updated_at = ? WHERE id = ?', args: [Date.now(), params.id] },
+  ]
 
-    // 2. Delete world-state entries sourced from this chapter
-    db.prepare(
-      `DELETE FROM book_state_entries WHERE source = 'chapter' AND source_id = ?`
-    ).run(params.chapterId)
+  // Delete characters that only appeared in this chapter
+  for (const name of chapterCharNames) {
+    if (namesElsewhere.has(name)) continue
+    statements.splice(-2, 0, {
+      sql: 'DELETE FROM characters WHERE book_id = ? AND name = ?',
+      args: [params.id, name],
+    })
+  }
 
-    // 3. Delete characters that only appeared in this chapter
-    for (const name of chapterCharNames) {
-      if (namesElsewhere.has(name)) continue
-      db.prepare(
-        'DELETE FROM characters WHERE book_id = ? AND name = ?'
-      ).run(params.id, name)
-    }
-
-    // 4. Delete the chapter (cascades to continuity_flags, annotations via FK)
-    db.prepare('DELETE FROM chapters WHERE id = ?').run(params.chapterId)
-
-    // 5. Shift all higher-numbered chapters in this book down by 1
-    db.prepare(
-      'UPDATE chapters SET number = number - 1 WHERE book_id = ? AND number > ?'
-    ).run(params.id, chapter.number)
-
-    // 6. Bump book updated_at
-    db.prepare('UPDATE books SET updated_at = ? WHERE id = ?').run(Date.now(), params.id)
-  })()
-
+  await batchWrite(statements)
   return NextResponse.json({ ok: true })
 }
