@@ -54,16 +54,31 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* Pull quote */}
+        {/* Definition + description */}
         <div>
+          {/* Headword + pronunciation */}
+          <div className="flex items-baseline gap-3 mb-1">
+            <span className="text-[28px] leading-none text-foreground" style={{ fontFamily: 'var(--font-playfair)' }}>
+              fief
+            </span>
+            <span className="text-sm text-muted-foreground/70" style={{ fontFamily: 'var(--font-playfair)', fontStyle: 'italic' }}>
+              /fiːf/
+            </span>
+          </div>
+          {/* Part of speech */}
+          <p className="text-xs text-muted-foreground/50 italic mb-4">noun</p>
+          {/* Definition */}
           <p
-            className="text-[22px] leading-snug text-foreground"
-            style={{ fontFamily: 'var(--font-playfair)', fontStyle: 'italic' }}
+            className="text-[17px] leading-snug text-foreground"
+            style={{ fontFamily: 'var(--font-playfair)' }}
           >
-            "Let the world burn through you. Throw the prism light, white hot, on paper."
+            A person's sphere of operation or control.
           </p>
-          <p className="text-sm text-muted-foreground mt-4">
-            —Ray Bradbury, <span style={{ fontStyle: 'italic' }}>WD</span>
+          {/* Divider */}
+          <hr className="border-border mt-5 mb-4" />
+          {/* App description */}
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Where worlds are kept.
           </p>
         </div>
 

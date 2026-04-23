@@ -83,6 +83,16 @@ ALWAYS respond with valid JSON — no markdown, no commentary, just JSON:
   "response": "string",
   "input_type": "fact" | "event" | "question" | "correction",
   "state_updates": [...],
+  "relationship_updates": [
+    {
+      "character_a": "exact character name as it appears in lore",
+      "character_b": "exact character name as it appears in lore",
+      "type": "ally" | "enemy" | "neutral" | "romantic" | "family" | "mentor" | "rival" | "unknown",
+      "description": "one sentence describing the relationship",
+      "strength": 1-5,
+      "status": "active" | "strained" | "broken" | "unknown"
+    }
+  ],
   "ripple_effects": [...],
   "contradictions": [...],
   "timeline_event": {...} | null,
@@ -174,6 +184,7 @@ export async function POST(
       response: string
       input_type: string
       state_updates: Array<{ type: string; name: string; action: string; summary: string; data: Record<string, unknown> }>
+      relationship_updates?: Array<{ character_a: string; character_b: string; type: string; description?: string; strength?: number; status?: string }>
       ripple_effects: Array<{ title: string; description: string }>
       contradictions: Array<{ description: string; existing: string; resolution_options: string[] }>
       timeline_event?: { title: string; description: string; in_story_date?: string } | null
@@ -291,6 +302,39 @@ export async function POST(
                VALUES (?, ?, ?, ?, ?, ?, 'chat', ?, ?, ?)`
             ).run(generateId(), params.id, update.type, update.name, update.summary ?? '', JSON.stringify(update.data ?? {}), assistantMsgId, now, now)
           }
+        }
+      }
+
+      // Upsert relationships extracted by AI
+      for (const rel of parsed.relationship_updates ?? []) {
+        const charA = db
+          .prepare('SELECT id FROM characters WHERE book_id = ? AND name = ?')
+          .get(params.id, rel.character_a) as { id: string } | undefined
+        const charB = db
+          .prepare('SELECT id FROM characters WHERE book_id = ? AND name = ?')
+          .get(params.id, rel.character_b) as { id: string } | undefined
+        if (!charA || !charB || charA.id === charB.id) continue
+
+        const [aId, bId] = [charA.id, charB.id].sort()
+        const type = rel.type ?? 'unknown'
+        const strength = Math.min(5, Math.max(1, rel.strength ?? 1))
+        const status = rel.status ?? 'unknown'
+
+        const existing = db
+          .prepare('SELECT id FROM character_relationships WHERE character_a_id = ? AND character_b_id = ?')
+          .get(aId, bId) as { id: string } | undefined
+
+        if (existing) {
+          db.prepare(
+            `UPDATE character_relationships SET type = ?, description = COALESCE(?, description),
+             strength = ?, status = ?, updated_at = ? WHERE id = ?`
+          ).run(type, rel.description ?? null, strength, status, now, existing.id)
+        } else {
+          db.prepare(
+            `INSERT INTO character_relationships
+               (id, book_id, character_a_id, character_b_id, type, description, strength, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(generateId(), params.id, aId, bId, type, rel.description ?? null, strength, status, now, now)
         }
       }
 

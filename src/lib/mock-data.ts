@@ -1,6 +1,7 @@
 import type { WorldMessageData } from '@/components/WorldMessage'
 import type { LoreEntry } from '@/components/LoreSlideOver'
 import type { CharacterFull } from '@/components/CharacterDetailSlideOver'
+import type { CharacterRelationship } from '@/components/RelationshipMap'
 
 export const MOCK_BOOK_ID = 'mock-book-1'
 
@@ -64,6 +65,40 @@ export const mockCharacters: CharacterFull[] = [
       notable_moments: [
         'Her informants noticed the Threadweaver network activating across the Scholar\'s Quarter — she doesn\'t know why yet.',
         'Quietly rerouted three northern trade ships after the early winter storms, personally absorbing the loss to keep member houses loyal.',
+      ],
+    }),
+  },
+  {
+    id: 'char-5',
+    name: 'Mira',
+    role: 'supporting',
+    status: 'unknown',
+    description:
+      'Kael\'s former intelligence contact. Went silent the same week the garrison was doubled. Last seen entering the Scholar\'s Quarter in Valdris.',
+    arc_status: 'Gone dark. Her silence may be voluntary — or not.',
+    data: JSON.stringify({
+      traits: ['Resourceful', 'Guarded', 'Difficult to find', 'Knows too much'],
+      relationships: [
+        { character_name: 'Kael Ardenvoss', description: 'Rare genuine trust. Kael relies on her more than he would admit.' },
+      ],
+      notable_moments: [
+        'Sold information to the Threadweavers before going silent — she may have been The Courier\'s contact.',
+      ],
+    }),
+  },
+  {
+    id: 'char-6',
+    name: 'The Courier',
+    role: 'minor',
+    status: 'dead',
+    description:
+      'A Threadweaver courier intercepted by Kael on a mountain road. The letter in his satchel bore the queen\'s private cipher. He did not survive the encounter.',
+    arc_status: 'Dead. The letter he carried started everything.',
+    data: JSON.stringify({
+      traits: ['Expendable', 'Loyal to the Threadweavers'],
+      relationships: [],
+      notable_moments: [
+        'Intercepted and killed by Kael three months before the story\'s present.',
       ],
     }),
   },
@@ -496,6 +531,93 @@ export const mockChapters: Array<{
     correctionNotes: [],
   },
 ];
+
+export const mockRelationships: CharacterRelationship[] = [
+  {
+    id: 'rel-1',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-1', // Kael Ardenvoss
+    character_b_id: 'char-2', // Queen Isaveth Vranel
+    type: 'enemy',
+    description: 'Kael knows Seraphel engineered his disgrace. She considers him a loose thread that must be cut.',
+    strength: 5,
+    status: 'active',
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: 'rel-2',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-1', // Kael Ardenvoss
+    character_b_id: 'char-5', // Mira
+    type: 'ally',
+    description: 'Genuine trust, which is unusual for Mira. Kael relies on her more than anyone.',
+    strength: 4,
+    status: 'strained',
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: 'rel-3',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-1', // Kael Ardenvoss
+    character_b_id: 'char-4', // Lord Therin Mast
+    type: 'ally',
+    description: 'Uneasy tolerance. Therin shelters Kael without asking why.',
+    strength: 3,
+    status: 'active',
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: 'rel-4',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-2', // Queen Isaveth Vranel
+    character_b_id: 'char-3', // Renara Voss
+    type: 'rival',
+    description: 'Mutual wariness disguised as mutual respect.',
+    strength: 4,
+    status: 'active',
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: 'rel-5',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-2', // Queen Isaveth Vranel
+    character_b_id: 'char-6', // The Courier
+    type: 'ally',
+    description: 'Seraphel used the Threadweavers. The Courier was expendable.',
+    strength: 2,
+    status: 'broken',
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: 'rel-6',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-5', // Mira
+    character_b_id: 'char-6', // The Courier
+    type: 'unknown',
+    description: 'Mira sold information to the Threadweavers before. The Courier may have been her contact.',
+    strength: 2,
+    status: 'unknown',
+    created_at: 0,
+    updated_at: 0,
+  },
+  {
+    id: 'rel-7',
+    book_id: MOCK_BOOK_ID,
+    character_a_id: 'char-2', // Queen Isaveth Vranel
+    character_b_id: 'char-4', // Lord Therin Mast
+    type: 'neutral',
+    description: 'Pays tribute. Does not trust her. Has not moved against her.',
+    strength: 3,
+    status: 'strained',
+    created_at: 0,
+    updated_at: 0,
+  },
+]
 
 export const mockProcessingSteps = [
   {

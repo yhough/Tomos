@@ -2,6 +2,9 @@
 
 import { CharacterCard } from '@/components/CharacterCard'
 import { CharacterDetailSlideOver, type CharacterFull } from '@/components/CharacterDetailSlideOver'
+import { RelationshipMap, type RelationshipWithNames } from '@/components/RelationshipMap'
+import { RelationshipEdgePanel } from '@/components/RelationshipEdgePanel'
+import { AddRelationshipModal } from '@/components/AddRelationshipModal'
 import { ChapterList } from '@/components/ChaptersTab/ChapterList'
 import { ProcessingPipeline } from '@/components/ChaptersTab/ProcessingPipeline'
 import { TimelineTab as TimelineTabContent } from '@/components/TimelineTab'
@@ -9,7 +12,7 @@ import { LoreSidebar, type LoreSidebarHandle } from '@/components/LoreSidebar'
 import { BookDetailsSlideOver } from '@/components/BookDetailsSlideOver'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { WorldMessage, type WorldMessageData } from '@/components/WorldMessage'
-import { mockBook, mockChapters, mockCharacters, mockLoreSections, mockMessages, mockProcessingSteps, MOCK_BOOK_ID } from '@/lib/mock-data'
+import { mockBook, mockChapters, mockCharacters, mockLoreSections, mockMessages, mockProcessingSteps, mockRelationships, MOCK_BOOK_ID } from '@/lib/mock-data'
 import { useTheme } from '@/hooks/useTheme'
 import type { ChatMetadata } from '@/types'
 import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Moon, Settings2, Sparkles, Sun, Upload, Zap } from 'lucide-react'
@@ -443,7 +446,12 @@ function WorldTab({
 function CharactersTab({ bookId, refreshKey, onEditInChat }: { bookId: string; refreshKey?: number; onEditInChat?: (message: string) => void }) {
   const isMock = bookId === MOCK_BOOK_ID
   const [characters, setCharacters] = useState<CharacterFull[]>(isMock ? mockCharacters : [])
+  const [relationships, setRelationships] = useState<RelationshipWithNames[]>(isMock ? mockRelationships : [])
   const [selected, setSelected] = useState<CharacterFull | null>(null)
+  const [showMap, setShowMap] = useState(true)
+  const [hoveredCharId, setHoveredCharId] = useState<string | null>(null)
+  const [selectedRel, setSelectedRel] = useState<RelationshipWithNames | null>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   useEffect(() => {
     if (isMock) return
@@ -453,18 +461,76 @@ function CharactersTab({ bookId, refreshKey, onEditInChat }: { bookId: string; r
       .catch(() => {})
   }, [bookId, isMock, refreshKey])
 
-  const ROLE_ORDER: Record<string, number> = {
-    protagonist: 0,
-    antagonist: 1,
-    supporting: 2,
-    minor: 3,
+  useEffect(() => {
+    if (isMock) return
+    fetch(`/api/books/${bookId}/relationships`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setRelationships)
+      .catch(() => {})
+  }, [bookId, isMock, refreshKey])
+
+  async function handleSaveRelationship(id: string, patch: Partial<RelationshipWithNames>) {
+    if (isMock) { setRelationships((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r)); return }
+    const res = await fetch(`/api/books/${bookId}/relationships/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) throw new Error('Failed to save')
+    const updated = await res.json() as RelationshipWithNames
+    setRelationships((prev) => prev.map((r) => r.id === id ? updated : r))
+    setSelectedRel(updated)
   }
 
+  async function handleDeleteRelationship(id: string) {
+    if (isMock) { setRelationships((prev) => prev.filter((r) => r.id !== id)); return }
+    const res = await fetch(`/api/books/${bookId}/relationships/${id}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to delete')
+    setRelationships((prev) => prev.filter((r) => r.id !== id))
+  }
+
+  async function handleAddRelationship(data: {
+    character_a_id: string; character_b_id: string; type: string
+    status: string; strength: number; description: string
+  }) {
+    if (isMock) {
+      const charA = characters.find((c) => c.id === data.character_a_id)
+      const charB = characters.find((c) => c.id === data.character_b_id)
+      const newRel: RelationshipWithNames = {
+        id: `mock-rel-${Date.now()}`,
+        book_id: bookId,
+        character_a_id: data.character_a_id,
+        character_b_id: data.character_b_id,
+        type: data.type as RelationshipWithNames['type'],
+        status: data.status as RelationshipWithNames['status'],
+        strength: data.strength,
+        description: data.description || null,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        character_a_name: charA?.name,
+        character_a_role: charA?.role,
+        character_b_name: charB?.name,
+        character_b_role: charB?.role,
+      }
+      setRelationships((prev) => [...prev, newRel])
+      return
+    }
+    const res = await fetch(`/api/books/${bookId}/relationships`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(err.error ?? 'Failed to create')
+    }
+    const created = await res.json() as RelationshipWithNames
+    setRelationships((prev) => [...prev, created])
+  }
+
+  const ROLE_ORDER: Record<string, number> = { protagonist: 0, antagonist: 1, supporting: 2, minor: 3 }
   const ROLE_LABELS: Record<string, string> = {
-    protagonist: 'Protagonists',
-    antagonist: 'Antagonists',
-    supporting: 'Supporting',
-    minor: 'Minor',
+    protagonist: 'Protagonists', antagonist: 'Antagonists', supporting: 'Supporting', minor: 'Minor',
   }
 
   function charCompleteness(c: CharacterFull) {
@@ -502,6 +568,37 @@ function CharactersTab({ bookId, refreshKey, onEditInChat }: { bookId: string; r
           </div>
         ) : (
           <div className="flex flex-col gap-8 p-8">
+            {/* Map toggle */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowMap((s) => !s)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  showMap
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full transition-colors ${showMap ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+                {showMap ? 'Hide' : 'Show'} relationship map
+              </button>
+            </div>
+
+            {/* Relationship map */}
+            {showMap && (
+              <RelationshipMap
+                characters={characters}
+                relationships={relationships}
+                hoveredCharId={hoveredCharId}
+                onNodeClick={(id) => {
+                  const char = characters.find((c) => c.id === id)
+                  if (char) setSelected(char)
+                }}
+                onEdgeClick={setSelectedRel}
+                onAddClick={() => setAddModalOpen(true)}
+              />
+            )}
+
+            {/* Character grid */}
             {groupOrder.map((role) => (
               <section key={role}>
                 <div className="flex items-center gap-3 mb-4">
@@ -519,6 +616,9 @@ function CharactersTab({ bookId, refreshKey, onEditInChat }: { bookId: string; r
                       key={char.id}
                       character={char}
                       onClick={() => setSelected(char)}
+                      onMouseEnter={() => setHoveredCharId(char.id)}
+                      onMouseLeave={() => setHoveredCharId(null)}
+                      highlighted={hoveredCharId === char.id}
                     />
                   ))}
                 </div>
@@ -532,6 +632,22 @@ function CharactersTab({ bookId, refreshKey, onEditInChat }: { bookId: string; r
         character={selected}
         onClose={() => setSelected(null)}
         onEditInChat={onEditInChat}
+      />
+
+      <RelationshipEdgePanel
+        relationship={selectedRel}
+        onClose={() => setSelectedRel(null)}
+        onSave={handleSaveRelationship}
+        onDelete={handleDeleteRelationship}
+        isMock={isMock}
+      />
+
+      <AddRelationshipModal
+        open={addModalOpen}
+        characters={characters}
+        onClose={() => setAddModalOpen(false)}
+        onSubmit={handleAddRelationship}
+        isMock={isMock}
       />
     </>
   )

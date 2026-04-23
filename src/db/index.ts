@@ -145,6 +145,25 @@ function createDb(): Database.Database {
     );
   `)
 
+  // Relationships table
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS character_relationships (
+      id TEXT PRIMARY KEY,
+      book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      character_a_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+      character_b_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+      type TEXT NOT NULL DEFAULT 'unknown'
+           CHECK(type IN ('ally','enemy','neutral','romantic','family','mentor','rival','unknown')),
+      description TEXT,
+      strength INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'unknown'
+             CHECK(status IN ('active','strained','broken','unknown')),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(character_a_id, character_b_id)
+    );
+  `)
+
   // Billing columns on users
   try { sqlite.exec(`ALTER TABLE users ADD COLUMN stripe_customer_id TEXT`) } catch { /* already exists */ }
   try { sqlite.exec(`ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'`) } catch { /* already exists */ }

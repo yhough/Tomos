@@ -19,9 +19,12 @@ const STATUS_DOT: Record<string, string> = {
 interface Props {
   character: CharacterFull
   onClick: () => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+  highlighted?: boolean
 }
 
-export function CharacterCard({ character, onClick }: Props) {
+export function CharacterCard({ character, onClick, onMouseEnter, onMouseLeave, highlighted }: Props) {
   let traits: string[] = []
   try {
     const d = JSON.parse(character.data)
@@ -34,7 +37,11 @@ export function CharacterCard({ character, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className="text-left w-full rounded-xl border border-border bg-card hover:border-amber-300/60 hover:bg-amber-50/40 transition-all duration-150 p-5 flex flex-col gap-3 group"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={`text-left w-full rounded-xl border bg-card hover:border-amber-300/60 hover:bg-amber-50/40 transition-all duration-150 p-5 flex flex-col gap-3 group ${
+        highlighted ? 'border-amber-400/70 bg-amber-50/30 shadow-sm' : 'border-border'
+      }`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
