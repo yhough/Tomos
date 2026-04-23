@@ -1,11 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
-
-function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
-  return new Anthropic({ apiKey })
-}
-
 export async function generateBookOpening(params: {
   title: string
   genre: string
@@ -13,7 +5,10 @@ export async function generateBookOpening(params: {
   protagonist_name?: string | null
   protagonist_description?: string | null
 }): Promise<{ logline: string; welcome: string }> {
-  const client = getClient()
+  const { default: Anthropic } = await import('@anthropic-ai/sdk')
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
+  const client = new Anthropic({ apiKey })
 
   const details = [
     `Title: ${params.title}`,

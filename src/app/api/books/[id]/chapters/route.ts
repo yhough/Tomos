@@ -1,9 +1,9 @@
 import { queryFirst, queryAll, execute } from '@/db'
 import { generateId } from '@/lib/utils'
-import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
 
-function getClient(): Anthropic {
+async function getClient() {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
   return new Anthropic({ apiKey })
@@ -205,7 +205,7 @@ export async function POST(
       previousExcerpts,
     })
 
-    const client = getClient()
+    const client = await getClient()
     const aiResponse = await client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 8000,

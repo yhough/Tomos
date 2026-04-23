@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser } from '@/lib/auth'
 import { stripe, getOrCreateStripeCustomer } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
