@@ -56,29 +56,17 @@ export default function LoginPage() {
 
         {/* Definition + description */}
         <div>
-          {/* Headword + pronunciation */}
-          <div className="flex items-baseline gap-3 mb-1">
-            <span className="text-[28px] leading-none text-foreground" style={{ fontFamily: 'var(--font-playfair)' }}>
-              fief
-            </span>
-            <span className="text-sm text-muted-foreground/70" style={{ fontFamily: 'var(--font-playfair)', fontStyle: 'italic' }}>
-              /fiːf/
-            </span>
-          </div>
-          {/* Part of speech */}
-          <p className="text-xs text-muted-foreground/50 italic mb-4">noun</p>
-          {/* Definition */}
+          <p className="text-xs font-medium tracking-widest text-muted-foreground/60 uppercase mb-3">
+            fief
+          </p>
           <p
-            className="text-[17px] leading-snug text-foreground"
-            style={{ fontFamily: 'var(--font-playfair)' }}
+            className="text-[21px] leading-snug text-foreground"
+            style={{ fontFamily: 'var(--font-playfair)', fontStyle: 'italic' }}
           >
             A person's sphere of operation or control.
           </p>
-          {/* Divider */}
-          <hr className="border-border mt-5 mb-4" />
-          {/* App description */}
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Where worlds are kept.
+          <p className="text-sm text-muted-foreground mt-5 leading-relaxed">
+            Bring your world to life.
           </p>
         </div>
 
