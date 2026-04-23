@@ -12,10 +12,11 @@ import { LoreSidebar, type LoreSidebarHandle } from '@/components/LoreSidebar'
 import { BookDetailsSlideOver } from '@/components/BookDetailsSlideOver'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { WorldMessage, type WorldMessageData } from '@/components/WorldMessage'
+import { ExportModal } from '@/components/ExportModal'
 import { mockBook, mockChapters, mockCharacters, mockLoreSections, mockMessages, mockProcessingSteps, mockRelationships, MOCK_BOOK_ID } from '@/lib/mock-data'
 import { useTheme } from '@/hooks/useTheme'
 import type { ChatMetadata } from '@/types'
-import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Moon, Settings2, Sparkles, Sun, Upload, Zap } from 'lucide-react'
+import { AlertTriangle, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Download, Moon, Settings2, Sparkles, Sun, Upload, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -41,6 +42,7 @@ export default function BookPage({ params }: Props) {
   const [timelineKey, setTimelineKey] = useState(0)
   const [pendingResolveFlagId, setPendingResolveFlagId] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [bookDetails, setBookDetails] = useState<{ title: string; genre: string; premise: string | null; cover_image: string | null } | null>(null)
   const { dark, toggle: toggleTheme } = useTheme()
 
@@ -99,13 +101,22 @@ export default function BookPage({ params }: Props) {
             ))}
             <div className="w-px h-4 bg-border mx-1" />
             {!isMockBook && (
-              <button
-                onClick={() => setDetailsOpen(true)}
-                title="Edit book details"
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Settings2 size={14} />
-              </button>
+              <>
+                <button
+                  onClick={() => setExportOpen(true)}
+                  title="Export world bible"
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <Download size={14} />
+                </button>
+                <button
+                  onClick={() => setDetailsOpen(true)}
+                  title="Edit book details"
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <Settings2 size={14} />
+                </button>
+              </>
             )}
             <button
               onClick={toggleTheme}
@@ -124,6 +135,12 @@ export default function BookPage({ params }: Props) {
         initial={bookDetails}
         onClose={() => setDetailsOpen(false)}
         onSaved={(updated) => setBookDetails({ ...updated, cover_image: updated.cover_image ?? null })}
+      />
+
+      <ExportModal
+        bookId={params.id}
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
       />
 
       {/* Tab content — fills remaining height, no outer scroll */}
